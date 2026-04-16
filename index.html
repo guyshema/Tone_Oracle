@@ -1,0 +1,2146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#0a0208">
+<title>Tone Oracle — FX Edition v2</title>
+<style>
+  html,body {
+    margin:0; padding:0; background:#0a0208; color:#f2e8c9;
+    font-family:"Menlo","Consolas",monospace; overflow:hidden; height:100%; width:100%;
+    overscroll-behavior:none; touch-action:manipulation;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  #c {
+    display:block; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#0a0208;
+    touch-action:none;
+  }
+  #overlay {
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, #220509 0%, #000 80%);
+    transition:opacity 0.8s ease; z-index:10; user-select:none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    box-sizing:border-box;
+  }
+  #overlay.hidden { opacity:0; pointer-events:none; }
+  #overlay h1 { font-size:56px; color:#d13a2e; text-shadow:0 0 20px #7a1e10, 0 0 40px #3a0a06; margin:0 0 18px 0; letter-spacing:6px; font-weight:900; text-align:center; }
+  #overlay p { color:#d09890; font-size:15px; margin:0 0 28px 0; letter-spacing:1px; text-align:center; padding:0 12px; }
+  #pwForm { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  #pwInput {
+    background:#15060a; color:#fff; border:2px solid #5a1a12; border-radius:6px;
+    padding:12px 16px; font-family:inherit; font-size:18px; outline:none; letter-spacing:3px; width:240px;
+    -webkit-appearance:none; appearance:none;
+  }
+  #pwInput:focus { border-color:#d13a2e; box-shadow:0 0 14px #7a1e10; }
+  #pwSubmit {
+    background:#a42d24; color:#fff; border:none; padding:12px 22px; border-radius:6px;
+    font-family:inherit; font-weight:700; cursor:pointer; font-size:18px; letter-spacing:2px;
+    -webkit-appearance:none; appearance:none;
+  }
+  #pwSubmit:active, #pwSubmit:hover { background:#d13a2e; }
+  #pwError { color:#ff7964; margin-top:18px; height:20px; font-size:14px; letter-spacing:1px; }
+  .shake { animation:shake 0.35s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-14px)} 75%{transform:translateX(14px)} }
+  #hint { position:fixed; right:14px; bottom:calc(10px + env(safe-area-inset-bottom)); font-size:11px; color:#7a6a5a; z-index:5; letter-spacing:1px; pointer-events:none; }
+
+  /* Device-mode pills on the overlay */
+  #deviceToggle { display:flex; gap:8px; margin-top:22px; }
+  .devPill {
+    background:#1a0d12; color:#a98c84; border:2px solid #4a1a18; border-radius:999px;
+    padding:8px 18px; font-family:inherit; font-size:13px; letter-spacing:2px; cursor:pointer;
+    -webkit-appearance:none; appearance:none;
+  }
+  .devPill.active { background:#5a1a12; color:#fff; border-color:#d13a2e; }
+
+  /* Bottom helper that suggests turning up volume on mobile */
+  #volumeHint {
+    position:fixed; left:50%; top:calc(10px + env(safe-area-inset-top)); transform:translateX(-50%);
+    background:rgba(0,0,0,0.65); color:#ffd166; padding:8px 14px; border-radius:8px;
+    font-size:13px; letter-spacing:1px; z-index:6; opacity:0; transition:opacity 0.5s ease;
+    pointer-events:none;
+  }
+  #volumeHint.visible { opacity:1; }
+
+  /* Hidden probe used to read env(safe-area-inset-bottom) in JS */
+  #safeProbe { position:fixed; left:0; right:0; bottom:0; height:env(safe-area-inset-bottom); pointer-events:none; visibility:hidden; }
+
+  /* FX rack (volume + reverb + delay + 8bit + REC) */
+  #fxRack {
+    position:fixed; left:0; right:0;
+    bottom: calc(60px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center; align-items:center; gap:18px;
+    padding:8px 14px; z-index:4;
+    background: linear-gradient(to top, rgba(12,4,6,0.82), rgba(12,4,6,0.4));
+    border-top:1px solid #2a0a10;
+    pointer-events:auto; -webkit-user-select:none; user-select:none;
+  }
+  #fxRack.hidden { display:none; }
+  .fader { display:flex; flex-direction:column; align-items:center; min-width:120px; }
+  .fader label {
+    color:#e2b8a6; font-size:10px; letter-spacing:2px; font-weight:700;
+    margin-bottom:3px;
+  }
+  .fader input[type="range"] {
+    -webkit-appearance:none; appearance:none; width:130px; height:16px; background:transparent;
+  }
+  .fader input[type="range"]::-webkit-slider-runnable-track {
+    height:5px; background:#2a0d12; border:1px solid #4a1a18; border-radius:6px;
+  }
+  .fader input[type="range"]::-moz-range-track {
+    height:5px; background:#2a0d12; border:1px solid #4a1a18; border-radius:6px;
+  }
+  .fader input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none;
+    width:18px; height:18px; border-radius:50%;
+    background:#d13a2e; border:2px solid #ffd0a0; margin-top:-8px;
+    box-shadow:0 0 8px #7a1e10;
+  }
+  .fader input[type="range"]::-moz-range-thumb {
+    width:16px; height:16px; border-radius:50%;
+    background:#d13a2e; border:2px solid #ffd0a0;
+    box-shadow:0 0 8px #7a1e10;
+  }
+  .fader.vol input[type="range"]::-webkit-slider-thumb { background:#ffcc33; border-color:#fff2a8; box-shadow:0 0 10px #e69a18; }
+  .fader.vol input[type="range"]::-moz-range-thumb     { background:#ffcc33; border-color:#fff2a8; box-shadow:0 0 10px #e69a18; }
+  .fader .val {
+    color:#fcd77c; font-size:11px; letter-spacing:1px; margin-top:2px;
+    font-variant-numeric: tabular-nums; min-height:14px;
+  }
+  #recBtn {
+    background:#5a1a12; color:#fff; border:2px solid #d13a2e; padding:10px 14px;
+    border-radius:8px; font-family:inherit; font-weight:700; cursor:pointer;
+    font-size:13px; letter-spacing:2px; min-width:104px;
+    -webkit-appearance:none; appearance:none;
+  }
+  #recBtn.recording { background:#c82020; animation:pulseRec 1s ease-in-out infinite; }
+  #recBtn.disabled  { opacity:0.4; cursor:not-allowed; }
+  @keyframes pulseRec { 50% { opacity:0.55; } }
+  #recInfo { color:#ffd166; font-size:11px; letter-spacing:1px; min-width:60px; text-align:left; font-variant-numeric: tabular-nums; }
+  #recFmtSel { display:flex; gap:4px; margin-right:2px; }
+  .fmtPill {
+    background:#1a0d12; color:#a98c84; border:2px solid #4a1a18; border-radius:6px;
+    padding:7px 10px; font-family:inherit; font-size:11px; letter-spacing:1px; cursor:pointer;
+    -webkit-appearance:none; appearance:none;
+  }
+  .fmtPill.active { background:#5a1a12; color:#fff; border-color:#d13a2e; }
+  .fmtPill.disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* Compact form on narrow screens (phones) */
+  @media (max-width: 520px) {
+    #overlay h1 { font-size:38px; letter-spacing:4px; margin-bottom:14px; }
+    #overlay p { font-size:13px; margin-bottom:20px; }
+    #pwInput { width:60vw; max-width:280px; font-size:16px; padding:14px 14px; }
+    #pwSubmit { font-size:16px; padding:14px 18px; }
+    .devPill { padding:10px 16px; font-size:12px; }
+    #hint { font-size:10px; }
+    #fxRack { gap:6px; padding:6px 6px; flex-wrap:wrap; bottom: calc(128px + env(safe-area-inset-bottom)); }
+    .fader { min-width:70px; }
+    .fader input[type="range"] { width:78px; }
+    .fader label { font-size:9px; letter-spacing:1px; }
+    .fader .val { font-size:10px; }
+    #recBtn { padding:8px 10px; font-size:12px; letter-spacing:1px; min-width:70px; }
+    #recInfo { font-size:10px; min-width:0; }
+    .fmtPill { padding:6px 8px; font-size:10px; }
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="safeProbe"></div>
+<div id="volumeHint">🔊 TURN UP THE VOLUME</div>
+<div id="fxRack" class="hidden" aria-label="Effects rack">
+  <div class="fader vol">
+    <label for="fxVolume">VOLUME</label>
+    <input id="fxVolume" type="range" min="0" max="2" step="0.01" value="1">
+    <span class="val" id="fxVolumeVal">1.00×</span>
+  </div>
+  <div class="fader">
+    <label for="fxReverb">REVERB</label>
+    <input id="fxReverb" type="range" min="0" max="1" step="0.01" value="0">
+    <span class="val" id="fxReverbVal">0.00</span>
+  </div>
+  <div class="fader">
+    <label for="fxDelay">DELAY</label>
+    <input id="fxDelay" type="range" min="0" max="1" step="0.01" value="0">
+    <span class="val" id="fxDelayVal">0.00</span>
+  </div>
+  <div class="fader">
+    <label for="fxCrush">8-BIT</label>
+    <input id="fxCrush" type="range" min="0" max="1" step="0.01" value="0">
+    <span class="val" id="fxCrushVal">0.00</span>
+  </div>
+  <div id="recFmtSel" role="group" aria-label="Recording format">
+    <button class="fmtPill" data-fmt="wav" type="button" title="WAV (uncompressed, largest, universal)">WAV</button>
+    <button class="fmtPill" data-fmt="webm" type="button" title="WEBM / M4A (compressed, smaller)">WEBM</button>
+  </div>
+  <button id="recBtn" type="button" title="Record session and download">● REC</button>
+  <span id="recInfo"></span>
+</div>
+<div id="overlay">
+  <h1>TONE ORACLE</h1>
+  <p>SPEAK THE WORD TO OPEN THE GATES</p>
+  <form id="pwForm">
+    <input id="pwInput" type="password" autocomplete="off" autofocus inputmode="text" placeholder="password">
+    <button id="pwSubmit" type="submit">UNLOCK</button>
+  </form>
+  <div id="pwError"></div>
+  <div id="deviceToggle" aria-label="Choose layout">
+    <button class="devPill" data-dev="desktop" type="button">DESKTOP</button>
+    <button class="devPill" data-dev="mobile"  type="button">MOBILE</button>
+  </div>
+  <p id="deviceCaption" style="margin-top:10px; font-size:11px; color:#7a6a5a;"></p>
+</div>
+<div id="hint"></div>
+<script>
+"use strict";
+
+// =========================================================================
+// CONSTANTS (parity with Python V4)
+// =========================================================================
+const FREQ_MIN = 20, FREQ_MAX = 7000, BAND_LIMITED_FREQ_MAX = 2500;
+const DUR_MIN_MS = 40, DUR_MAX_MS = 2000;
+const AMP_MIN = 0.15, AMP_MAX = 0.6;
+const MODE3_SLOTS = 4, MODE4_SLOTS = 6;
+const MODE3_SLOT_AMP = 0.42, MODE4_SLOT_AMP = 0.30;
+const MODE4_BURST_PROB = 0.18, MODE4_BURST_MIN_MS = 4, MODE4_BURST_MAX_MS = 35;
+const PASSWORD = "devil";
+const DEVICE_KEY = "toneOracleDevice";
+
+// =========================================================================
+// DEVICE DETECTION + per-device layout
+// =========================================================================
+function detectMobile() {
+  let coarse = false, ua = false;
+  try { coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches; } catch(e){}
+  try { ua = /Mobi|Android|iPhone|iPad|iPod|Touch/i.test(navigator.userAgent || ""); } catch(e){}
+  const small = window.innerWidth < 760;
+  return coarse || ua || small;
+}
+function getSavedDevice() {
+  try { const v = localStorage.getItem(DEVICE_KEY); if (v === "mobile" || v === "desktop") return v; } catch(e){}
+  return null;
+}
+function saveDevice(v) { try { localStorage.setItem(DEVICE_KEY, v); } catch(e){} }
+
+const layout = {
+  device: getSavedDevice() || (detectMobile() ? "mobile" : "desktop"),
+  detected: detectMobile() ? "mobile" : "desktop",
+  particleMax: 600,
+  mode4Slots: 6,
+  dprCap: 3,
+  btnH: 36,
+  btnRows: 1,
+  safeBottom: 0,
+  safeTop: 0,
+};
+function applyDeviceLayout() {
+  const m = layout.device === "mobile";
+  layout.particleMax = m ? 300 : 600;
+  layout.mode4Slots = m ? 4 : 6;
+  layout.dprCap = m ? 2 : 3;
+  layout.btnH = m ? 52 : 36;
+  layout.btnRows = m ? 2 : 1;
+}
+applyDeviceLayout();
+
+const MAX_ACTIVE_VOICES = (layout.device === "mobile") ? 64 : 96;
+
+// =========================================================================
+// FX state (persisted) — initialized early so initAudio can use it.
+// =========================================================================
+const FX_KEY = "toneOracleFX_v1";
+const fxDefault = { volume: 1.0, reverb: 0.0, delay: 0.0, crush: 0.0 };
+function loadFx() {
+  try {
+    const raw = localStorage.getItem(FX_KEY);
+    if (!raw) return Object.assign({}, fxDefault);
+    const parsed = JSON.parse(raw);
+    const out = Object.assign({}, fxDefault, parsed);
+    out.volume = Math.max(0, Math.min(2, +out.volume || 0));
+    out.reverb = Math.max(0, Math.min(1, +out.reverb || 0));
+    out.delay  = Math.max(0, Math.min(1, +out.delay  || 0));
+    out.crush  = Math.max(0, Math.min(1, +out.crush  || 0));
+    return out;
+  } catch(e) { return Object.assign({}, fxDefault); }
+}
+function persistFx() { try { localStorage.setItem(FX_KEY, JSON.stringify(state.fx)); } catch(e){} }
+
+// =========================================================================
+// Global state — declared early so initAudio + scheduler share it.
+// =========================================================================
+const state = {
+  mode: 1,
+  playing: false,
+  output: "stereo",
+  slots: [],
+  tickHandle: null,
+  lastDisplay: { name: "-", freq: 0, endT: 0 },
+  fx: loadFx(),
+};
+
+const VOICE_NAMES = [
+  "sine","saw","square","pulse","triangle","white","pink","fnoise",
+  "fm","ringmod","chirp","click","detuned","glitch","tremolo"
+];
+
+// =========================================================================
+// RNG helpers
+// =========================================================================
+const rand = (lo, hi) => lo + Math.random() * (hi - lo);
+const logU = (lo, hi) => lo * Math.pow(hi / lo, Math.random());
+const choice = (arr) => arr[(Math.random() * arr.length) | 0];
+const irange = (lo, hi) => Math.floor(lo + Math.random() * (hi - lo + 1));
+
+// =========================================================================
+// Gap distribution (ported 1:1 from Python draw_gap_samples)
+// =========================================================================
+function drawGapSeconds(mode) {
+  const r = Math.random();
+  let ms;
+  if (mode === 1) {
+    ms = r < 0.25 ? 1500 + Math.random() * 2500 : logU(30, 1500);
+  } else if (mode === 2) {
+    ms = r < 0.25 ? 2000 + Math.random() * 3000 : logU(30, 2000);
+  } else if (mode === 3) {
+    ms = r < 0.30 ? 3000 + Math.random() * 3000 : logU(50, 3000);
+  } else {
+    if (r < 0.15) ms = 0;
+    else if (r < 0.45) ms = logU(0.5, 100);
+    else if (r < 0.75) ms = logU(100, 2000);
+    else if (r < 0.95) ms = logU(2000, 6000);
+    else ms = logU(6000, 15000);
+  }
+  return Math.max(0.0005, ms / 1000);
+}
+
+// =========================================================================
+// AUDIO
+// =========================================================================
+let ctx = null;
+let voiceBus, masterGain, stereoPath, monoPath, splitter, monoSum, merger, compressor, analyser;
+let analyserBuf;
+let crushDry, crushWet, crushSum, bitcrushNode;
+let delayNode, delayFeedback, delayDry, delayWet, delaySum;
+let convolver, reverbDry, reverbWet, reverbSum;
+let clipper, streamDest;
+const activeVoices = [];
+
+// Soft-knee clipper: transparent below |x|=0.7, smooth saturation above.
+function makeSoftClipCurve(n) {
+  n = n || 8192;
+  const curve = new Float32Array(n);
+  const threshold = 0.7;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    const a = Math.abs(x);
+    if (a <= threshold) curve[i] = x;
+    else {
+      const over = (a - threshold) / (1 - threshold);
+      const soft = threshold + (1 - threshold) * Math.tanh(over * 2);
+      curve[i] = Math.sign(x) * soft;
+    }
+  }
+  return curve;
+}
+
+// Staircase quantization (fallback if AudioWorklet unavailable).
+function makeBitcrushCurve(bits, n) {
+  n = n || 8192;
+  const steps = Math.pow(2, bits);
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.round(x * steps) / steps;
+  }
+  return curve;
+}
+
+function makeReverbIR(seconds, decay) {
+  seconds = seconds || 2.0; decay = decay || 3.0;
+  const n = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const buf = ctx.createBuffer(2, n, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < n; i++) {
+      const env = Math.pow(1 - i / n, decay);
+      d[i] = (Math.random() * 2 - 1) * env;
+    }
+  }
+  return buf;
+}
+
+// Inline AudioWorklet: bit-depth + sample-rate reduction ("8-bit").
+const BITCRUSH_WORKLET = [
+  "class BitcrushProcessor extends AudioWorkletProcessor {",
+  "  static get parameterDescriptors() {",
+  "    return [",
+  "      { name: 'bits', defaultValue: 16, minValue: 1, maxValue: 16, automationRate: 'k-rate' },",
+  "      { name: 'normFreq', defaultValue: 1.0, minValue: 0.002, maxValue: 1.0, automationRate: 'k-rate' }",
+  "    ];",
+  "  }",
+  "  constructor() { super(); this.phase = 0; this.last = [0, 0]; }",
+  "  process(inputs, outputs, parameters) {",
+  "    const input = inputs[0]; const output = outputs[0];",
+  "    if (!input || !input.length) return true;",
+  "    const bitsArr = parameters.bits; const nfArr = parameters.normFreq;",
+  "    for (let ch = 0; ch < input.length; ch++) {",
+  "      const inC = input[ch]; const outC = output[ch];",
+  "      let phase = this.phase;",
+  "      let lastSample = this.last[ch] || 0;",
+  "      const len = inC.length;",
+  "      for (let i = 0; i < len; i++) {",
+  "        const bits = bitsArr.length > 1 ? bitsArr[i] : bitsArr[0];",
+  "        const nf = nfArr.length > 1 ? nfArr[i] : nfArr[0];",
+  "        const step = Math.pow(0.5, bits);",
+  "        phase += nf;",
+  "        if (phase >= 1.0) { phase -= 1.0; lastSample = step * Math.floor(inC[i] / step + 0.5); }",
+  "        outC[i] = lastSample;",
+  "      }",
+  "      if (ch === 0) this.phase = phase;",
+  "      this.last[ch] = lastSample;",
+  "    }",
+  "    return true;",
+  "  }",
+  "}",
+  "registerProcessor('bitcrush-processor', BitcrushProcessor);"
+].join("\n");
+
+async function initAudio() {
+  if (ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  ctx = new AC({ latencyHint: "interactive" });
+
+  // Voice bus — voices still connect here.
+  voiceBus = ctx.createGain(); voiceBus.gain.value = 1;
+
+  // ---- Bitcrush (crossfade dry / wet) ----
+  crushDry = ctx.createGain(); crushDry.gain.value = 1 - state.fx.crush;
+  crushWet = ctx.createGain(); crushWet.gain.value = state.fx.crush;
+  crushSum = ctx.createGain(); crushSum.gain.value = 1;
+  voiceBus.connect(crushDry).connect(crushSum);
+
+  let workletLoaded = false;
+  try {
+    if (ctx.audioWorklet && typeof ctx.audioWorklet.addModule === "function") {
+      const blob = new Blob([BITCRUSH_WORKLET], { type: "application/javascript" });
+      const url = URL.createObjectURL(blob);
+      await ctx.audioWorklet.addModule(url);
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 1000);
+      bitcrushNode = new AudioWorkletNode(ctx, "bitcrush-processor", { numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2] });
+      workletLoaded = true;
+    }
+  } catch (e) { workletLoaded = false; }
+  if (!workletLoaded) {
+    bitcrushNode = ctx.createWaveShaper();
+    bitcrushNode.curve = makeBitcrushCurve(4);
+    bitcrushNode.oversample = "2x";
+  }
+  // Alias tamer on the bitcrush wet return. Reduces high-frequency
+  // aliasing introduced by the sample-rate reduction + staircase quant.
+  const crushAA = ctx.createBiquadFilter();
+  crushAA.type = "lowpass";
+  crushAA.frequency.value = Math.min(12000, ctx.sampleRate * 0.42);
+  crushAA.Q.value = 0.707;
+  voiceBus.connect(bitcrushNode);
+  bitcrushNode.connect(crushAA).connect(crushWet).connect(crushSum);
+
+  // ---- Delay (dry always + feedback loop wet) ----
+  // Lowpass INSIDE the feedback loop gives tape-style darkening on each
+  // repeat and tames any HF residue that might alias in long feedback.
+  delayNode = ctx.createDelay(2.5);
+  delayNode.delayTime.value = 0.35;
+  const delayAA = ctx.createBiquadFilter();
+  delayAA.type = "lowpass";
+  delayAA.frequency.value = 6500;
+  delayAA.Q.value = 0.707;
+  delayFeedback = ctx.createGain(); delayFeedback.gain.value = 0.45;
+  delayDry = ctx.createGain(); delayDry.gain.value = 1;
+  delayWet = ctx.createGain(); delayWet.gain.value = state.fx.delay * 0.8;
+  delaySum = ctx.createGain(); delaySum.gain.value = 1;
+  crushSum.connect(delayDry).connect(delaySum);
+  crushSum.connect(delayNode);
+  delayNode.connect(delayAA);
+  delayAA.connect(delayFeedback);
+  delayFeedback.connect(delayNode);
+  delayAA.connect(delayWet).connect(delaySum);
+
+  // ---- Reverb (convolver) ----
+  // Alias tamer on the reverb wet return.
+  convolver = ctx.createConvolver();
+  convolver.buffer = makeReverbIR(2.0, 3.0);
+  const reverbAA = ctx.createBiquadFilter();
+  reverbAA.type = "lowpass";
+  reverbAA.frequency.value = 9500;
+  reverbAA.Q.value = 0.707;
+  reverbDry = ctx.createGain(); reverbDry.gain.value = 1;
+  reverbWet = ctx.createGain(); reverbWet.gain.value = state.fx.reverb * 0.8;
+  reverbSum = ctx.createGain(); reverbSum.gain.value = 1;
+  delaySum.connect(reverbDry).connect(reverbSum);
+  delaySum.connect(convolver);
+  convolver.connect(reverbAA).connect(reverbWet).connect(reverbSum);
+
+  // ---- Master volume (0..2) ----
+  masterGain = ctx.createGain();
+  masterGain.gain.value = state.fx.volume;
+  reverbSum.connect(masterGain);
+
+  // ---- Soft clipper (safety, transparent <0.7 then smooth saturation) ----
+  clipper = ctx.createWaveShaper();
+  clipper.curve = makeSoftClipCurve();
+  clipper.oversample = "4x";
+  masterGain.connect(clipper);
+
+  // ---- Stereo / mono switch (now fed by clipper) ----
+  stereoPath = ctx.createGain(); stereoPath.gain.value = 1;
+  clipper.connect(stereoPath);
+
+  splitter = ctx.createChannelSplitter(2);
+  clipper.connect(splitter);
+
+  monoSum = ctx.createGain();
+  monoSum.channelCount = 1;
+  monoSum.channelCountMode = "explicit";
+  monoSum.gain.value = 0.5;
+  splitter.connect(monoSum, 0);
+  splitter.connect(monoSum, 1);
+
+  merger = ctx.createChannelMerger(2);
+  monoSum.connect(merger, 0, 0);
+  monoSum.connect(merger, 0, 1);
+
+  monoPath = ctx.createGain(); monoPath.gain.value = 0;
+  merger.connect(monoPath);
+
+  // ---- Safety compressor ----
+  compressor = ctx.createDynamicsCompressor();
+  compressor.threshold.value = -3;
+  compressor.knee.value = 6;
+  compressor.ratio.value = 8;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.12;
+  stereoPath.connect(compressor);
+  monoPath.connect(compressor);
+
+  // ---- Taps: analyser for pulse, streamDest for recording ----
+  analyser = ctx.createAnalyser();
+  analyser.fftSize = 1024;
+  analyserBuf = new Float32Array(analyser.fftSize);
+  compressor.connect(analyser);
+  compressor.connect(ctx.destination);
+  try { streamDest = ctx.createMediaStreamDestination(); compressor.connect(streamDest); } catch(e) { streamDest = null; }
+
+  // Apply saved bitcrush params now that the node exists.
+  applyFx(true);
+}
+
+async function ensureAudio() {
+  if (!ctx) await initAudio();
+  if (ctx && ctx.state === "suspended") {
+    try { await ctx.resume(); } catch(e) {}
+  }
+}
+
+// Apply slider values onto the FX graph. Uses setTargetAtTime for
+// zipper-free updates. Called on every slider input and on init.
+function applyFx(force) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const tc = 0.01;
+  if (masterGain) masterGain.gain.setTargetAtTime(state.fx.volume, t, tc);
+  if (reverbWet)  reverbWet.gain.setTargetAtTime(state.fx.reverb * 0.8, t, tc);
+  if (delayWet)   delayWet.gain.setTargetAtTime(state.fx.delay * 0.8, t, tc);
+  if (crushDry)   crushDry.gain.setTargetAtTime(1 - state.fx.crush, t, tc);
+  if (crushWet)   crushWet.gain.setTargetAtTime(state.fx.crush, t, tc);
+  if (bitcrushNode && bitcrushNode.parameters) {
+    const bitsParam = bitcrushNode.parameters.get("bits");
+    const nfParam = bitcrushNode.parameters.get("normFreq");
+    const bits = 16 - state.fx.crush * 13;            // 16 -> 3 bits
+    const nf   = Math.pow(0.08, state.fx.crush);      // 1 -> 0.08 (sample-rate reduction)
+    if (bitsParam && bitsParam.setTargetAtTime) bitsParam.setTargetAtTime(bits, t, tc);
+    else if (bitsParam) bitsParam.value = bits;
+    if (nfParam && nfParam.setTargetAtTime) nfParam.setTargetAtTime(nf, t, tc);
+    else if (nfParam) nfParam.value = nf;
+  }
+}
+
+function setMonoOutput(monoOn) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const fade = 0.015;
+  stereoPath.gain.cancelScheduledValues(t);
+  monoPath.gain.cancelScheduledValues(t);
+  stereoPath.gain.setValueAtTime(stereoPath.gain.value, t);
+  monoPath.gain.setValueAtTime(monoPath.gain.value, t);
+  stereoPath.gain.linearRampToValueAtTime(monoOn ? 0 : 1, t + fade);
+  monoPath.gain.linearRampToValueAtTime(monoOn ? 1 : 0, t + fade);
+  state.output = monoOn ? "mono" : "stereo";
+}
+
+// =========================================================================
+// Envelope helper: attack/release shrink to fit any duration
+// =========================================================================
+function attachEnvelope(param, startT, dur, amp, attack = 0.005, release = 0.015) {
+  let atk = attack, rel = release;
+  if (atk + rel > dur * 0.9) { atk = dur * 0.3; rel = dur * 0.3; }
+  param.setValueAtTime(0, startT);
+  param.linearRampToValueAtTime(amp, startT + atk);
+  param.setValueAtTime(amp, startT + Math.max(atk, dur - rel));
+  param.linearRampToValueAtTime(0, startT + dur);
+}
+
+function makePanner(pan) {
+  const p = ctx.createStereoPanner();
+  p.pan.value = Math.max(-1, Math.min(1, pan));
+  return p;
+}
+
+// Track a voice's nodes so we can force-release and GC
+function registerVoice(envGain, oscNodes, endT, displayName, displayFreq) {
+  const entry = { env: envGain, nodes: oscNodes.slice(), endT, name: displayName, freq: displayFreq };
+  activeVoices.push(entry);
+  const last = oscNodes[oscNodes.length - 1];
+  if (last && "onended" in last) {
+    last.onended = () => {
+      const i = activeVoices.indexOf(entry);
+      if (i >= 0) activeVoices.splice(i, 1);
+      for (const n of entry.nodes) { try { n.disconnect(); } catch(e){} }
+      try { envGain.disconnect(); } catch(e){}
+    };
+  }
+  return entry;
+}
+
+function forceReleaseAll() {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const fade = 0.025;
+  for (const av of activeVoices) {
+    if (av.endT > t + fade) {
+      try {
+        av.env.gain.cancelScheduledValues(t);
+        av.env.gain.setValueAtTime(av.env.gain.value, t);
+        av.env.gain.linearRampToValueAtTime(0, t + fade);
+        for (const n of av.nodes) {
+          if (n.stop) { try { n.stop(t + fade); } catch(e){} }
+        }
+        av.endT = t + fade;
+      } catch(e){}
+    }
+  }
+}
+
+// =========================================================================
+// PeriodicWave builder for variable-width pulse
+// =========================================================================
+const pulseWaveCache = new Map();
+function getPulseWave(width, freq) {
+  const nyquist = ctx.sampleRate / 2;
+  const kMax = Math.min(256, Math.max(5, Math.floor((nyquist * 0.95) / Math.max(freq, 1))));
+  const key = `${width.toFixed(2)}_${kMax}`;
+  if (pulseWaveCache.has(key)) return pulseWaveCache.get(key);
+  const real = new Float32Array(kMax + 1);
+  const imag = new Float32Array(kMax + 1);
+  for (let n = 1; n <= kMax; n++) {
+    const f = 2 / (n * Math.PI);
+    real[n] =  f * Math.sin(2 * Math.PI * n * width);
+    imag[n] = -f * (1 - Math.cos(2 * Math.PI * n * width));
+  }
+  const pw = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+  pulseWaveCache.set(key, pw);
+  return pw;
+}
+
+// =========================================================================
+// Noise buffers (cached ones for speed)
+// =========================================================================
+function makeWhiteBuffer(durSec) {
+  const n = Math.max(1, Math.floor(durSec * ctx.sampleRate));
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * 0.6;
+  return buf;
+}
+
+function makePinkBuffer(durSec) {
+  // Paul Kellet filter — per-sample, fast in V8
+  const n = Math.max(1, Math.floor(durSec * ctx.sampleRate));
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+  for (let i = 0; i < n; i++) {
+    const w = (Math.random() * 2 - 1) * 0.5;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.96900 * b2 + w * 0.1538520;
+    b3 = 0.86650 * b3 + w * 0.3104856;
+    b4 = 0.55000 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.0168980;
+    const pink = b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362;
+    b6 = w * 0.115926;
+    d[i] = Math.max(-1, Math.min(1, pink * 0.22));
+  }
+  return buf;
+}
+
+// =========================================================================
+// VOICE FACTORIES — each returns { displayName, displayFreq, endT }
+// =========================================================================
+
+function voiceSine(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = p.freq;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "sine", p.freq);
+  return { displayName: "sine", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceSaw(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.value = p.freq;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "saw", p.freq);
+  return { displayName: "saw", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceSquare(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "square";
+  osc.frequency.value = p.freq;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "square", p.freq);
+  return { displayName: "square", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voicePulse(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.setPeriodicWave(getPulseWave(p.width, p.freq));
+  osc.frequency.value = p.freq;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "pulse", p.freq);
+  return { displayName: "pulse", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceTriangle(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.value = p.freq;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "triangle", p.freq);
+  return { displayName: "triangle", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceWhite(startT, p) {
+  const buf = makeWhiteBuffer(p.dur + 0.05);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  src.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.7);
+  src.start(startT);
+  src.stop(startT + p.dur + 0.05);
+  registerVoice(env, [src], startT + p.dur, "white", 0);
+  return { displayName: "white", displayFreq: 0, endT: startT + p.dur };
+}
+
+function voicePink(startT, p) {
+  const buf = makePinkBuffer(p.dur + 0.05);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  src.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp);
+  src.start(startT);
+  src.stop(startT + p.dur + 0.05);
+  registerVoice(env, [src], startT + p.dur, "pink", 0);
+  return { displayName: "pink", displayFreq: 0, endT: startT + p.dur };
+}
+
+function voiceFilteredNoise(startT, p) {
+  const buf = makeWhiteBuffer(p.dur + 0.05);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = p.fc;
+  bp.Q.value = p.q;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  src.connect(bp).connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 1.2);
+  src.start(startT);
+  src.stop(startT + p.dur + 0.05);
+  registerVoice(env, [src], startT + p.dur, "fnoise", p.fc);
+  return { displayName: "fnoise", displayFreq: p.fc, endT: startT + p.dur };
+}
+
+function voiceFM(startT, p) {
+  const carrier = ctx.createOscillator();
+  carrier.type = "sine";
+  carrier.frequency.value = p.fc;
+  const modulator = ctx.createOscillator();
+  modulator.type = "sine";
+  modulator.frequency.value = p.fm;
+  const idx = ctx.createGain();
+  idx.gain.value = p.index * p.fm;  // deviation in Hz
+  modulator.connect(idx).connect(carrier.frequency);
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  carrier.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.85);
+  carrier.start(startT); modulator.start(startT);
+  carrier.stop(startT + p.dur + 0.02); modulator.stop(startT + p.dur + 0.02);
+  registerVoice(env, [modulator, carrier], startT + p.dur, "fm", p.fc);
+  return { displayName: "fm", displayFreq: p.fc, endT: startT + p.dur };
+}
+
+function voiceRingMod(startT, p) {
+  const o1 = ctx.createOscillator();
+  o1.type = "sine"; o1.frequency.value = p.f1;
+  const o2 = ctx.createOscillator();
+  o2.type = "sine"; o2.frequency.value = p.f2;
+  const ringGain = ctx.createGain();
+  ringGain.gain.value = 0;   // will be driven by o2 for multiplication
+  o2.connect(ringGain.gain);
+  o1.connect(ringGain);
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  ringGain.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.9);
+  o1.start(startT); o2.start(startT);
+  o1.stop(startT + p.dur + 0.02); o2.stop(startT + p.dur + 0.02);
+  registerVoice(env, [o2, o1], startT + p.dur, "ringmod", (p.f1 + p.f2) / 2);
+  return { displayName: "ringmod", displayFreq: (p.f1 + p.f2) / 2, endT: startT + p.dur };
+}
+
+function voiceChirp(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(p.f0, startT);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, p.f1), startT + p.dur);
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.85);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  const mid = Math.sqrt(p.f0 * p.f1);
+  registerVoice(env, [osc], startT + p.dur, "chirp", mid);
+  return { displayName: "chirp", displayFreq: mid, endT: startT + p.dur };
+}
+
+function voiceClick(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sine"; osc.frequency.value = p.freq;
+  const nbuf = makeWhiteBuffer(p.dur + 0.02);
+  const nsrc = ctx.createBufferSource();
+  nsrc.buffer = nbuf;
+  const mix = ctx.createGain(); mix.gain.value = 1;
+  osc.connect(mix);
+  const noiseGain = ctx.createGain(); noiseGain.gain.value = 0.35;
+  nsrc.connect(noiseGain).connect(mix);
+
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  mix.connect(env).connect(pan).connect(voiceBus);
+
+  // exponential decay envelope
+  const tau = Math.max(0.002, p.decay);
+  env.gain.setValueAtTime(0, startT);
+  env.gain.linearRampToValueAtTime(p.amp, startT + 0.001);
+  env.gain.setTargetAtTime(0, startT + 0.001, tau);
+  // also hard-stop at end
+  env.gain.setValueAtTime(0, startT + p.dur);
+
+  osc.start(startT); nsrc.start(startT);
+  osc.stop(startT + p.dur + 0.02); nsrc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [nsrc, osc], startT + p.dur, "click", p.freq);
+  return { displayName: "click", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceDetuned(startT, p) {
+  const layers = p.layers;
+  const sumGain = ctx.createGain();
+  sumGain.gain.value = 1 / layers;
+  const oscs = [];
+  for (let i = 0; i < layers; i++) {
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    const cents = (i - (layers - 1) / 2) * p.spread;
+    o.frequency.value = p.freq * Math.pow(2, cents / 1200);
+    o.connect(sumGain);
+    oscs.push(o);
+  }
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  sumGain.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.9);
+  for (const o of oscs) { o.start(startT); o.stop(startT + p.dur + 0.02); }
+  registerVoice(env, oscs, startT + p.dur, "detuned", p.freq);
+  return { displayName: "detuned", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceGlitch(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sine"; osc.frequency.value = p.freq;
+  const gate = ctx.createGain();
+  gate.gain.value = 0;
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  osc.connect(gate).connect(env).connect(pan).connect(voiceBus);
+
+  // Step-sequence the gate at p.gateHz; duty p.duty.
+  const period = 1 / p.gateHz;
+  const onDur = period * p.duty;
+  let t = startT;
+  while (t < startT + p.dur) {
+    gate.gain.setValueAtTime(1, t);
+    gate.gain.setValueAtTime(0, Math.min(startT + p.dur, t + onDur));
+    t += period;
+  }
+
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.85, 0.002, 0.008);
+  osc.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  registerVoice(env, [osc], startT + p.dur, "glitch", p.freq);
+  return { displayName: "glitch", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+function voiceTremolo(startT, p) {
+  const osc = ctx.createOscillator();
+  osc.type = "sine"; osc.frequency.value = p.freq;
+  const lfo = ctx.createOscillator();
+  lfo.type = "sine"; lfo.frequency.value = p.tremHz;
+  const lfoDepth = ctx.createGain();
+  lfoDepth.gain.value = p.depth * 0.5;
+  // LFO outputs [-depth*0.5, +depth*0.5]; add 1 - depth*0.5 for a unipolar [1-depth, 1] scale
+  const offset = ctx.createConstantSource();
+  offset.offset.value = 1 - p.depth * 0.5;
+  const amMix = ctx.createGain();
+  amMix.gain.value = 0;
+  lfo.connect(lfoDepth).connect(amMix.gain);
+  offset.connect(amMix.gain);
+  osc.connect(amMix);
+
+  const env = ctx.createGain();
+  const pan = makePanner(p.pan);
+  amMix.connect(env).connect(pan).connect(voiceBus);
+  attachEnvelope(env.gain, startT, p.dur, p.amp * 0.9);
+
+  osc.start(startT); lfo.start(startT); offset.start(startT);
+  osc.stop(startT + p.dur + 0.02);
+  lfo.stop(startT + p.dur + 0.02);
+  offset.stop(startT + p.dur + 0.02);
+  registerVoice(env, [lfo, offset, osc], startT + p.dur, "tremolo", p.freq);
+  return { displayName: "tremolo", displayFreq: p.freq, endT: startT + p.dur };
+}
+
+// =========================================================================
+// Param drawing per voice type
+// =========================================================================
+function drawVoiceParams(name, mode) {
+  let dur = logU(DUR_MIN_MS, DUR_MAX_MS) / 1000;
+  let amp = rand(AMP_MIN, AMP_MAX);
+  const pan = rand(-1, 1);
+
+  let p = { dur, amp, pan, name };
+  switch (name) {
+    case "sine":     p.freq = logU(FREQ_MIN, FREQ_MAX); break;
+    case "saw":      p.freq = logU(FREQ_MIN, BAND_LIMITED_FREQ_MAX); p.amp *= 0.7; break;
+    case "square":   p.freq = logU(FREQ_MIN, BAND_LIMITED_FREQ_MAX); p.amp *= 0.6; break;
+    case "pulse":    p.freq = logU(FREQ_MIN, BAND_LIMITED_FREQ_MAX); p.amp *= 0.6; p.width = 0.1 + 0.8 * Math.random(); break;
+    case "triangle": p.freq = logU(FREQ_MIN, FREQ_MAX); p.amp *= 0.9; break;
+    case "white":    /* no freq */ break;
+    case "pink":     break;
+    case "fnoise":   p.fc = logU(150, 5000); p.q = rand(4, 16); break;
+    case "fm": {
+      p.fc = logU(40, 3000);
+      const ratio = choice([0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, Math.SQRT2]);
+      p.fm = p.fc * ratio;
+      p.index = 0.5 + 5.5 * Math.random();
+      p.amp *= 0.85;
+      break;
+    }
+    case "ringmod":  p.f1 = logU(80, 2000); p.f2 = logU(80, 2000); p.amp *= 0.85; break;
+    case "chirp": {
+      p.dur = 0.2 + Math.random() * 1.5;
+      p.f0 = logU(FREQ_MIN, FREQ_MAX);
+      p.f1 = logU(FREQ_MIN, FREQ_MAX);
+      p.amp *= 0.85;
+      break;
+    }
+    case "click": {
+      p.dur = 0.03 + Math.random() * 0.08;
+      p.freq = logU(200, 5000);
+      p.decay = 0.005 + Math.random() * 0.03;
+      break;
+    }
+    case "detuned": {
+      p.freq = logU(80, 1200);
+      p.layers = irange(3, 5);
+      p.spread = 3 + Math.random() * 20;
+      p.amp *= 0.9;
+      break;
+    }
+    case "glitch": {
+      p.freq = logU(120, 2500);
+      p.gateHz = 8 + Math.random() * 50;
+      p.duty = 0.3 + Math.random() * 0.5;
+      p.amp *= 0.85;
+      break;
+    }
+    case "tremolo": {
+      p.freq = logU(FREQ_MIN, FREQ_MAX);
+      p.tremHz = 2 + Math.random() * 12;
+      p.depth = 0.4 + Math.random() * 0.6;
+      p.amp *= 0.9;
+      break;
+    }
+  }
+
+  if (mode === 4 && Math.random() < MODE4_BURST_PROB) {
+    const b = (MODE4_BURST_MIN_MS + Math.random() * (MODE4_BURST_MAX_MS - MODE4_BURST_MIN_MS)) / 1000;
+    if (b < p.dur) p.dur = b;
+  }
+  return p;
+}
+
+const FACTORY = {
+  sine: voiceSine, saw: voiceSaw, square: voiceSquare, pulse: voicePulse,
+  triangle: voiceTriangle, white: voiceWhite, pink: voicePink, fnoise: voiceFilteredNoise,
+  fm: voiceFM, ringmod: voiceRingMod, chirp: voiceChirp, click: voiceClick,
+  detuned: voiceDetuned, glitch: voiceGlitch, tremolo: voiceTremolo,
+};
+
+// =========================================================================
+// SCHEDULER
+// =========================================================================
+
+function slotsForMode(mode) {
+  if (mode === 3) return MODE3_SLOTS;
+  if (mode === 4) return layout.mode4Slots;
+  return 1;
+}
+function ampScaleForMode(mode) {
+  if (mode === 3) return MODE3_SLOT_AMP;
+  if (mode === 4) return MODE4_SLOT_AMP;
+  return 1.0;
+}
+
+function ensureSlots(mode) {
+  const n = slotsForMode(mode);
+  state.slots = [];
+  for (let i = 0; i < n; i++) state.slots.push({ nextT: ctx.currentTime + 0.04 + i * 0.01 });
+}
+
+function schedulerTick() {
+  if (!state.playing || !ctx) return;
+  const horizon = ctx.currentTime + 0.10;
+  const amp_scale = ampScaleForMode(state.mode);
+  for (const slot of state.slots) {
+    if (slot.nextT < ctx.currentTime - 0.05) slot.nextT = ctx.currentTime + 0.02;
+    let guard = 0;
+    while (slot.nextT < horizon && guard++ < 8) {
+      if (activeVoices.length > MAX_ACTIVE_VOICES) break;
+      const name = (state.mode === 1) ? "sine" : VOICE_NAMES[(Math.random() * VOICE_NAMES.length) | 0];
+      const p = drawVoiceParams(name, state.mode);
+      p.amp *= amp_scale;
+      const v = FACTORY[name](slot.nextT, p);
+      state.lastDisplay = { name: v.displayName, freq: v.displayFreq, endT: v.endT };
+      slot.nextT = v.endT + drawGapSeconds(state.mode);
+    }
+  }
+}
+
+function setPlaying(p) {
+  if (!ctx) return; // must be inited first via ensureAudio()
+  if (p === state.playing) return;
+  state.playing = p;
+  if (p) {
+    try { ctx.resume(); } catch(e) {}
+    ensureSlots(state.mode);
+    if (!state.tickHandle) state.tickHandle = setInterval(schedulerTick, 25);
+  } else {
+    if (state.tickHandle) { clearInterval(state.tickHandle); state.tickHandle = null; }
+    forceReleaseAll();
+  }
+}
+
+function setMode(m) {
+  if (m === state.mode) return;
+  state.mode = m;
+  if (state.playing) { forceReleaseAll(); ensureSlots(m); }
+}
+
+// =========================================================================
+// RENDERING (Canvas 2D)
+// =========================================================================
+const canvas = document.getElementById("c");
+const ctx2d = canvas.getContext("2d");
+let DPR = Math.max(1, window.devicePixelRatio || 1);
+let W = 0, H = 0;
+function readSafeInsets() {
+  const probe = document.getElementById("safeProbe");
+  if (probe) {
+    const r = probe.getBoundingClientRect();
+    layout.safeBottom = Math.max(0, Math.round(r.height));
+  }
+}
+function resize() {
+  const raw = Math.max(1, window.devicePixelRatio || 1);
+  DPR = Math.min(raw, layout.dprCap);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = Math.max(1, W * DPR);
+  canvas.height = Math.max(1, H * DPR);
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx2d.setTransform(DPR, 0, 0, DPR, 0, 0);
+  readSafeInsets();
+}
+window.addEventListener("resize", resize);
+window.addEventListener("orientationchange", () => setTimeout(resize, 100));
+resize();
+
+function hsv2rgb(h, s, v) {
+  h = ((h % 1) + 1) % 1;
+  const i = Math.floor(h * 6), f = h * 6 - i;
+  const P = v * (1 - s), Q = v * (1 - f * s), T = v * (1 - (1 - f) * s);
+  let r, g, b;
+  switch (i % 6) {
+    case 0: r=v; g=T; b=P; break;
+    case 1: r=Q; g=v; b=P; break;
+    case 2: r=P; g=v; b=T; break;
+    case 3: r=P; g=Q; b=v; break;
+    case 4: r=T; g=P; b=v; break;
+    case 5: r=v; g=P; b=Q; break;
+  }
+  return [ (r*255)|0, (g*255)|0, (b*255)|0 ];
+}
+function logFreqToHue(f) {
+  if (f <= 0) return 0;
+  const u = (Math.log(Math.max(f, FREQ_MIN)) - Math.log(FREQ_MIN)) / (Math.log(FREQ_MAX) - Math.log(FREQ_MIN));
+  return Math.max(0, Math.min(1, u));
+}
+
+// -------- Particles --------
+class FireParticles {
+  constructor(max = 600) {
+    this.max = max;
+    this.x = new Float32Array(max); this.y = new Float32Array(max);
+    this.vx = new Float32Array(max); this.vy = new Float32Array(max);
+    this.life = new Float32Array(max); this.maxlife = new Float32Array(max);
+    this.size = new Float32Array(max); this.kind = new Int8Array(max);
+    this.next = 0;
+  }
+  emitFlame(x, y, intensity) {
+    const n = (2 + 6 * intensity) | 0;
+    for (let k = 0; k < n; k++) {
+      const i = this.next++ % this.max;
+      this.x[i] = x + (Math.random() - 0.5) * 20;
+      this.y[i] = y + (Math.random() - 0.5) * 8;
+      this.vx[i] = (Math.random() - 0.5) * 0.8;
+      this.vy[i] = -(0.8 + Math.random() * 1.6) * (0.8 + intensity);
+      const life = 0.7 + Math.random() * 0.8;
+      this.life[i] = life; this.maxlife[i] = life;
+      this.size[i] = 8 + Math.random() * 18;
+      this.kind[i] = 0;
+    }
+  }
+  emitSpark(x, y, intensity) {
+    const n = (1 + 4 * intensity) | 0;
+    for (let k = 0; k < n; k++) {
+      const i = this.next++ % this.max;
+      this.x[i] = x; this.y[i] = y;
+      const ang = Math.random() * Math.PI * 2;
+      const sp = (1.5 + Math.random() * 3) * (0.5 + intensity);
+      this.vx[i] = Math.cos(ang) * sp;
+      this.vy[i] = Math.sin(ang) * sp - 0.5;
+      const life = 0.3 + Math.random() * 0.4;
+      this.life[i] = life; this.maxlife[i] = life;
+      this.size[i] = 3 + Math.random() * 4;
+      this.kind[i] = 1;
+    }
+  }
+  update(dt) {
+    for (let i = 0; i < this.max; i++) {
+      if (this.life[i] <= 0) continue;
+      this.x[i] += this.vx[i] * dt * 60;
+      this.y[i] += this.vy[i] * dt * 60;
+      if (this.kind[i] === 0) {
+        this.vy[i] *= 0.985; this.vx[i] *= 0.97;
+      } else {
+        this.vy[i] += 0.08;
+      }
+      this.life[i] -= dt;
+    }
+  }
+  draw(ctx2d) {
+    ctx2d.save();
+    ctx2d.globalCompositeOperation = "lighter";
+    for (let i = 0; i < this.max; i++) {
+      const l = this.life[i];
+      if (l <= 0) continue;
+      const u = Math.max(0, Math.min(1, l / this.maxlife[i]));
+      const sz = Math.max(2, this.size[i] * (0.4 + u * 0.8));
+      let r, g, b, a;
+      if (this.kind[i] === 0) {
+        if (u > 0.75)      { r=255; g=240; b=180; a=0.86 * u; }
+        else if (u > 0.45) { r=255; g=160; b= 40; a=0.78 * u; }
+        else if (u > 0.2)  { r=220; g= 60; b= 20; a=0.62 * u; }
+        else               { r=120; g= 10; b= 10; a=0.35 * u; }
+      } else {
+        r = 255; g = 230; b = 120; a = 0.9 * u;
+      }
+      ctx2d.fillStyle = `rgba(${r},${g},${b},${a.toFixed(3)})`;
+      ctx2d.beginPath();
+      ctx2d.arc(this.x[i], this.y[i], sz, 0, Math.PI * 2);
+      ctx2d.fill();
+    }
+    ctx2d.restore();
+  }
+}
+
+// -------- Imp character --------
+class Imp {
+  constructor(hx, hy, phase, scale = 0.55) {
+    this.hx = hx; this.hy = hy; this.phase = phase; this.scale = scale;
+  }
+  draw(ctx2d, t, pulse, particles) {
+    const bob = Math.sin(t * (3 + this.phase) + this.phase) * (8 + 14 * pulse);
+    const sway = Math.cos(t * (2 + this.phase * 0.7) + this.phase) * 6;
+    const cx = (this.hx + sway) | 0;
+    const cy = (this.hy - bob) | 0;
+    const s = this.scale;
+    ctx2d.save();
+    // body shadow
+    ctx2d.fillStyle = "#5a0c0c";
+    ctx2d.beginPath(); ctx2d.arc(cx, cy + 45 * s, 42 * s, 0, Math.PI * 2); ctx2d.fill();
+    // body tunic (trapezoid)
+    ctx2d.fillStyle = "#961e1e";
+    ctx2d.beginPath();
+    ctx2d.moveTo(cx - 35*s, cy - 5*s);
+    ctx2d.lineTo(cx + 35*s, cy - 5*s);
+    ctx2d.lineTo(cx + 22*s, cy + 45*s);
+    ctx2d.lineTo(cx - 22*s, cy + 45*s);
+    ctx2d.closePath(); ctx2d.fill();
+    // horns
+    ctx2d.fillStyle = "#0f0f0f";
+    ctx2d.beginPath();
+    ctx2d.moveTo(cx - 25*s, cy - 3*s);
+    ctx2d.lineTo(cx - 18*s, cy - 32*s);
+    ctx2d.lineTo(cx - 10*s, cy - 5*s);
+    ctx2d.closePath(); ctx2d.fill();
+    ctx2d.beginPath();
+    ctx2d.moveTo(cx + 25*s, cy - 3*s);
+    ctx2d.lineTo(cx + 18*s, cy - 32*s);
+    ctx2d.lineTo(cx + 10*s, cy - 5*s);
+    ctx2d.closePath(); ctx2d.fill();
+    // eyes
+    ctx2d.fillStyle = "#ffdc50";
+    ctx2d.beginPath(); ctx2d.arc(cx - 10*s, cy + 12*s, Math.max(2, 5*s), 0, Math.PI*2); ctx2d.fill();
+    ctx2d.beginPath(); ctx2d.arc(cx + 10*s, cy + 12*s, Math.max(2, 5*s), 0, Math.PI*2); ctx2d.fill();
+    ctx2d.fillStyle = "#000";
+    ctx2d.beginPath(); ctx2d.arc(cx - 10*s, cy + 12*s, Math.max(1, 2.5*s), 0, Math.PI*2); ctx2d.fill();
+    ctx2d.beginPath(); ctx2d.arc(cx + 10*s, cy + 12*s, Math.max(1, 2.5*s), 0, Math.PI*2); ctx2d.fill();
+    // tail
+    const tx = cx + (30*s + Math.sin(t*6 + this.phase) * 12 * s);
+    const ty = cy + 55 * s;
+    ctx2d.strokeStyle = "#5a0c0c";
+    ctx2d.lineWidth = Math.max(2, 3*s);
+    ctx2d.beginPath();
+    ctx2d.moveTo(cx + 22*s, cy + 45*s);
+    ctx2d.lineTo(tx, ty);
+    ctx2d.stroke();
+    ctx2d.fillStyle = "#7a1414";
+    ctx2d.beginPath();
+    ctx2d.moveTo(tx, ty);
+    ctx2d.lineTo(tx + 10*s, ty + 6*s);
+    ctx2d.lineTo(tx - 4*s, ty + 12*s);
+    ctx2d.closePath(); ctx2d.fill();
+    ctx2d.restore();
+
+    if (pulse > 0.25 || ((t + this.phase) % 0.5) < 0.05) {
+      particles.emitFlame(cx - 18*s, cy - 34*s, 0.3 + pulse);
+      particles.emitFlame(cx + 18*s, cy - 34*s, 0.3 + pulse);
+    }
+  }
+}
+
+// -------- Devil --------
+function drawDevil(ctx2d, cx, cy, pulse, t, particles) {
+  const tremor = Math.sin(t * 40) * (1 + 3 * pulse);
+  const cxt = (cx + tremor * 0.4) | 0;
+  const cyt = (cy + Math.sin(t * 7) * 1.5) | 0;
+
+  // halo (additive)
+  ctx2d.save();
+  ctx2d.globalCompositeOperation = "lighter";
+  const hueH = (t * 0.08) % 1;
+  for (const [rBase, aBase] of [[180, 40], [140, 60], [100, 90], [60, 130]]) {
+    const r = rBase * (1 + 0.15 * pulse);
+    const a = (aBase + 80 * pulse) / 255;
+    const [rr, gg, bb] = hsv2rgb((hueH + 0.02) % 1, 0.9, 1);
+    ctx2d.fillStyle = `rgba(${rr},${gg},${bb},${a.toFixed(3)})`;
+    ctx2d.beginPath(); ctx2d.arc(cxt, cyt - 20, r, 0, Math.PI * 2); ctx2d.fill();
+  }
+  ctx2d.restore();
+
+  // horn fire emit
+  particles.emitFlame(cxt - 40, cyt - 96, 0.6 + 0.8 * pulse);
+  particles.emitFlame(cxt + 40, cyt - 96, 0.6 + 0.8 * pulse);
+
+  // body shadow
+  ctx2d.fillStyle = "#5a0a0a";
+  ctx2d.beginPath(); ctx2d.arc(cxt, cyt + 60, 95, 0, Math.PI * 2); ctx2d.fill();
+  ctx2d.fillStyle = "#aa1919";
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt - 100, cyt + 30);
+  ctx2d.lineTo(cxt + 100, cyt + 30);
+  ctx2d.lineTo(cxt +  75, cyt + 140);
+  ctx2d.lineTo(cxt -  75, cyt + 140);
+  ctx2d.closePath(); ctx2d.fill();
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt - 80, cyt - 40);
+  ctx2d.lineTo(cxt + 80, cyt - 40);
+  ctx2d.lineTo(cxt + 60, cyt + 60);
+  ctx2d.lineTo(cxt - 60, cyt + 60);
+  ctx2d.closePath(); ctx2d.fill();
+
+  // horns
+  ctx2d.fillStyle = "#0a0a0a";
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt - 70, cyt - 30);
+  ctx2d.lineTo(cxt - 40, cyt - 90);
+  ctx2d.lineTo(cxt - 30, cyt - 25);
+  ctx2d.closePath(); ctx2d.fill();
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt + 70, cyt - 30);
+  ctx2d.lineTo(cxt + 40, cyt - 90);
+  ctx2d.lineTo(cxt + 30, cyt - 25);
+  ctx2d.closePath(); ctx2d.fill();
+
+  // eye glow (additive)
+  ctx2d.save();
+  ctx2d.globalCompositeOperation = "lighter";
+  for (const ex of [cxt - 22, cxt + 22]) {
+    ctx2d.fillStyle = `rgba(255,120,30,${(0.47 + 0.47 * pulse).toFixed(3)})`;
+    ctx2d.beginPath(); ctx2d.arc(ex, cyt - 5, 18 + 6 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  }
+  ctx2d.restore();
+  const eyeGlow = 120 + 135 * pulse;
+  for (const ex of [cxt - 22, cxt + 22]) {
+    ctx2d.fillStyle = `rgb(255,${eyeGlow|0},0)`;
+    ctx2d.beginPath(); ctx2d.arc(ex, cyt - 5, 8, 0, Math.PI * 2); ctx2d.fill();
+    ctx2d.fillStyle = "#000";
+    ctx2d.beginPath(); ctx2d.arc(ex, cyt - 5, 3, 0, Math.PI * 2); ctx2d.fill();
+  }
+
+  // mouth
+  const mouthOpen = 10 + 35 * pulse;
+  ctx2d.strokeStyle = "#0a0a0a"; ctx2d.lineWidth = 3;
+  ctx2d.beginPath();
+  ctx2d.ellipse(cxt, cyt + 10 + mouthOpen / 2, 30, mouthOpen / 2 + 3, 0, 0, Math.PI);
+  ctx2d.stroke();
+  ctx2d.fillStyle = "#f0e6d2";
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt - 10, cyt + 15);
+  ctx2d.lineTo(cxt - 5, cyt + 15 + mouthOpen / 2);
+  ctx2d.lineTo(cxt, cyt + 15);
+  ctx2d.closePath(); ctx2d.fill();
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt, cyt + 15);
+  ctx2d.lineTo(cxt + 5, cyt + 15 + mouthOpen / 2);
+  ctx2d.lineTo(cxt + 10, cyt + 15);
+  ctx2d.closePath(); ctx2d.fill();
+
+  // trident
+  ctx2d.strokeStyle = "#503214"; ctx2d.lineWidth = 5;
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt + 110, cyt + 10);
+  ctx2d.lineTo(cxt + 110, cyt + 150);
+  ctx2d.stroke();
+  ctx2d.fillStyle = "#c8c8d0";
+  ctx2d.beginPath();
+  ctx2d.moveTo(cxt + 110, cyt - 20);
+  ctx2d.lineTo(cxt +  98, cyt -  5);
+  ctx2d.lineTo(cxt + 104, cyt -  5);
+  ctx2d.lineTo(cxt + 104, cyt + 10);
+  ctx2d.lineTo(cxt + 116, cyt + 10);
+  ctx2d.lineTo(cxt + 116, cyt -  5);
+  ctx2d.lineTo(cxt + 122, cyt -  5);
+  ctx2d.closePath(); ctx2d.fill();
+}
+
+// -------- Speaker --------
+function drawSpeaker(ctx2d, cx, cy, hue, pulse, t, particles) {
+  const shake = Math.sin(t * 60) * (1.5 + 3 * pulse);
+  ctx2d.fillStyle = "#1a1a22";
+  ctx2d.strokeStyle = "#40404a";
+  ctx2d.lineWidth = 3;
+  roundRect(ctx2d, cx - 90 + shake, cy - 130, 180, 260, 12, true, true);
+  // halo
+  ctx2d.save();
+  ctx2d.globalCompositeOperation = "lighter";
+  const [hr, hg, hb] = hsv2rgb(hue, 0.9, 1);
+  const a = (60 + 140 * pulse) / 255;
+  ctx2d.fillStyle = `rgba(${hr},${hg},${hb},${a.toFixed(3)})`;
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, cy, 110 + 40 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  ctx2d.restore();
+  // tweeter
+  const tcy = cy - 70;
+  ctx2d.fillStyle = "#0f0f12";
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, tcy, 28, 0, Math.PI * 2); ctx2d.fill();
+  const [tr, tg, tb] = hsv2rgb(hue, 0.7, 0.9);
+  ctx2d.fillStyle = `rgb(${tr},${tg},${tb})`;
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, tcy, 18 + 8 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  ctx2d.fillStyle = "#fff";
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, tcy, 6 + 4 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  // woofer
+  const wcy = cy + 30;
+  ctx2d.fillStyle = "#0f0f12";
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, wcy, 70, 0, Math.PI * 2); ctx2d.fill();
+  const [or, og, ob] = hsv2rgb(hue, 0.85, 0.8);
+  ctx2d.fillStyle = `rgb(${or},${og},${ob})`;
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, wcy, 55 + 10 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  const [ir, ig, ib] = hsv2rgb((hue + 0.5) % 1, 0.9, 1);
+  ctx2d.fillStyle = `rgb(${ir},${ig},${ib})`;
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, wcy, 28 + 14 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  ctx2d.fillStyle = "#0a0a0a";
+  ctx2d.beginPath(); ctx2d.arc(cx + shake, wcy, 10 + 6 * pulse, 0, Math.PI * 2); ctx2d.fill();
+  // flames + sparks
+  particles.emitFlame(cx - 30 + shake, cy - 130, 0.5 + pulse);
+  particles.emitFlame(cx + 30 + shake, cy - 130, 0.5 + pulse);
+  if (pulse > 0.35) particles.emitSpark(cx + shake, wcy, pulse);
+}
+
+function roundRect(ctx2d, x, y, w, h, r, fill, stroke) {
+  ctx2d.beginPath();
+  ctx2d.moveTo(x + r, y);
+  ctx2d.lineTo(x + w - r, y);
+  ctx2d.arcTo(x + w, y, x + w, y + r, r);
+  ctx2d.lineTo(x + w, y + h - r);
+  ctx2d.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx2d.lineTo(x + r, y + h);
+  ctx2d.arcTo(x, y + h, x, y + h - r, r);
+  ctx2d.lineTo(x, y + r);
+  ctx2d.arcTo(x, y, x + r, y, r);
+  ctx2d.closePath();
+  if (fill) ctx2d.fill();
+  if (stroke) ctx2d.stroke();
+}
+
+// -------- Ground cracks, background --------
+function drawGroundCracks(ctx2d, t, pulse, sw, sh) {
+  const groundY = sh - 60;
+  ctx2d.save();
+  ctx2d.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 6; i++) {
+    const x0 = ((i + 0.5) * sw / 6) | 0;
+    const flick = 0.5 + 0.5 * Math.sin(t * 5 + i);
+    const a = (120 * flick + 80 * pulse) / 255;
+    ctx2d.fillStyle = `rgba(255,80,10,${a.toFixed(3)})`;
+    ctx2d.beginPath();
+    ctx2d.moveTo(x0 - 90, groundY + 40);
+    ctx2d.lineTo(x0 - 50, groundY + 20);
+    ctx2d.lineTo(x0 - 10, groundY + 45);
+    ctx2d.lineTo(x0 + 30, groundY + 15);
+    ctx2d.lineTo(x0 + 70, groundY + 40);
+    ctx2d.lineTo(x0 + 90, groundY + 30);
+    ctx2d.lineTo(x0 + 90, groundY + 80);
+    ctx2d.lineTo(x0 - 90, groundY + 80);
+    ctx2d.closePath(); ctx2d.fill();
+  }
+  ctx2d.restore();
+}
+
+function drawBackground(ctx2d, t, pulse, sw, sh) {
+  const baseV = 8 + (20 * pulse) | 0;
+  ctx2d.fillStyle = `rgb(${baseV + 4},2,6)`;
+  ctx2d.fillRect(0, 0, sw, sh);
+  ctx2d.save();
+  ctx2d.globalCompositeOperation = "lighter";
+  const hazeH = 160;
+  const grd = ctx2d.createLinearGradient(0, sh - hazeH, 0, sh);
+  const topA = (80 + 60 * pulse) / 255;
+  grd.addColorStop(0, `rgba(${120 + (60 * pulse)|0},20,10,0)`);
+  grd.addColorStop(1, `rgba(${120 + (60 * pulse)|0},20,10,${topA.toFixed(3)})`);
+  ctx2d.fillStyle = grd;
+  ctx2d.fillRect(0, sh - hazeH, sw, hazeH);
+  for (let i = 0; i < 7; i++) {
+    const phase = t * 0.3 + i * 1.1;
+    const x = (sw / 2 + Math.cos(phase) * (160 + 70 * i)) | 0;
+    const y = (sh / 2 + Math.sin(phase * 0.7) * (90 + 40 * i)) | 0;
+    const hue = 0.02 + ((t * 0.04 + i * 0.07) % 0.1);
+    const [r, g, b] = hsv2rgb(hue, 0.9, 0.35 + 0.2 * pulse);
+    const rg = ctx2d.createRadialGradient(x, y, 10, x, y, 180);
+    rg.addColorStop(0, `rgba(${r},${g},${b},0.28)`);
+    rg.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    ctx2d.fillStyle = rg;
+    ctx2d.fillRect(x - 180, y - 180, 360, 360);
+  }
+  const cx = sw / 2, cy = sh / 2;
+  const pts = [];
+  for (let k = 0; k < 5; k++) {
+    const ang = -Math.PI / 2 + k * (Math.PI * 4 / 5);
+    const r = 230 + 10 * Math.sin(t * 3 + k);
+    pts.push([cx + Math.cos(ang) * r, cy + Math.sin(ang) * r]);
+  }
+  const pa = (40 + 90 * pulse) / 255;
+  ctx2d.strokeStyle = `rgba(180,40,10,${pa.toFixed(3)})`;
+  ctx2d.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    ctx2d.beginPath();
+    ctx2d.moveTo(pts[i][0], pts[i][1]);
+    ctx2d.lineTo(pts[(i + 2) % 5][0], pts[(i + 2) % 5][1]);
+    ctx2d.stroke();
+  }
+  ctx2d.restore();
+}
+
+// -------- Imp layouts per mode (logical scene coords) --------
+function impsForMode(mode, sw, sh) {
+  const y = sh * 0.78;
+  if (mode === 1) return [new Imp(sw / 2, y, 0.2, 0.55)];
+  if (mode === 2) return [new Imp(sw * 0.35, y, 0, 0.58), new Imp(sw * 0.65, y, 1.3, 0.58)];
+  if (mode === 3) return [
+    new Imp(sw * 0.22, y, 0.0, 0.55),
+    new Imp(sw * 0.40, y + 4, 0.7, 0.58),
+    new Imp(sw * 0.60, y + 4, 1.4, 0.58),
+    new Imp(sw * 0.78, y, 2.1, 0.55),
+  ];
+  return [
+    new Imp(sw * 0.14, y, 0.0, 0.50),
+    new Imp(sw * 0.28, y + 4, 0.8, 0.55),
+    new Imp(sw * 0.42, y, 1.6, 0.53),
+    new Imp(sw * 0.58, y, 2.3, 0.53),
+    new Imp(sw * 0.72, y + 4, 3.1, 0.55),
+    new Imp(sw * 0.86, y, 3.9, 0.50),
+  ];
+}
+
+// -------- HUD / buttons --------
+const modeLabels = {
+  1: "MODE 1: PURE SINE",
+  2: "MODE 2: NOISE MACHINE",
+  3: "MODE 3: ALL TOGETHER",
+  4: "MODE 4: CACOPHONY",
+};
+
+function drawButtons(ctx2d, pulse) {
+  if (layout.device === "mobile") {
+    drawButtonsMobile(ctx2d, pulse);
+  } else {
+    drawButtonsDesktop(ctx2d, pulse);
+  }
+}
+
+function drawButtonsDesktop(ctx2d, pulse) {
+  const y = H - 54 - layout.safeBottom;
+  btns.play = { x: 24, y, w: 110, h: 36 };
+  drawBtn(ctx2d, btns.play, state.playing ? "STOP" : "START", state.playing ? "#c83a3a" : "#3ab258");
+  const modeW = 70, modeGap = 10;
+  const mStart = (W / 2) - (4 * modeW + 3 * modeGap) / 2;
+  for (let m = 1; m <= 4; m++) {
+    const x = mStart + (m - 1) * (modeW + modeGap);
+    const rect = { x, y, w: modeW, h: 36 };
+    btns["m" + m] = rect;
+    const active = state.mode === m;
+    drawBtn(ctx2d, rect, "M" + m, active ? "#c89c36" : "#3a3a50", "#ffffff");
+  }
+  btns.out = { x: W - 236, y, w: 110, h: 36 };
+  drawBtn(ctx2d, btns.out, state.output === "mono" ? "MONO" : "STEREO", "#3c64b4");
+  btns.quit = { x: W - 120, y, w: 96, h: 36 };
+  drawBtn(ctx2d, btns.quit, "QUIT", "#5a1e1e");
+  btns.fs = null;
+}
+
+function drawButtonsMobile(ctx2d, pulse) {
+  const btnH = layout.btnH;
+  const gap = 10;
+  const sb = layout.safeBottom;
+  const margin = 12;
+  const row2Y = H - btnH - 8 - sb;
+  const row1Y = row2Y - btnH - gap;
+
+  // Row 1 — modes M1..M4 centered
+  const totalW = W - margin * 2;
+  const modeW = Math.min(86, (totalW - 3 * gap) / 4);
+  const mStart = (W / 2) - (4 * modeW + 3 * gap) / 2;
+  for (let m = 1; m <= 4; m++) {
+    const rect = { x: mStart + (m - 1) * (modeW + gap), y: row1Y, w: modeW, h: btnH };
+    btns["m" + m] = rect;
+    const active = state.mode === m;
+    drawBtn(ctx2d, rect, "M" + m, active ? "#c89c36" : "#3a3a50", "#ffffff", 18);
+  }
+
+  // Row 2 — START/STOP, MONO/STEREO, FS, QUIT (4 evenly across)
+  const cols = 4;
+  const colW = (W - margin * 2 - gap * (cols - 1)) / cols;
+  let x = margin;
+  btns.play = { x, y: row2Y, w: colW, h: btnH };
+  drawBtn(ctx2d, btns.play, state.playing ? "STOP" : "START", state.playing ? "#c83a3a" : "#3ab258", "#fff", 16);
+  x += colW + gap;
+  btns.out = { x, y: row2Y, w: colW, h: btnH };
+  drawBtn(ctx2d, btns.out, state.output === "mono" ? "MONO" : "STEREO", "#3c64b4", "#fff", 14);
+  x += colW + gap;
+  btns.fs = { x, y: row2Y, w: colW, h: btnH };
+  drawBtn(ctx2d, btns.fs, isFullscreen() ? "EXIT FS" : "FS", "#3a8052", "#fff", 16);
+  x += colW + gap;
+  btns.quit = { x, y: row2Y, w: colW, h: btnH };
+  drawBtn(ctx2d, btns.quit, "QUIT", "#5a1e1e", "#fff", 16);
+}
+
+function drawBtn(ctx2d, rect, label, bg, fg = "#ffffff", fontPx = 16) {
+  ctx2d.fillStyle = bg;
+  roundRect(ctx2d, rect.x, rect.y, rect.w, rect.h, 8, true, false);
+  ctx2d.strokeStyle = "#ffffff80"; ctx2d.lineWidth = 2;
+  roundRect(ctx2d, rect.x, rect.y, rect.w, rect.h, 8, false, true);
+  ctx2d.fillStyle = fg;
+  ctx2d.font = `bold ${fontPx}px Menlo, Consolas, monospace`;
+  ctx2d.textAlign = "center"; ctx2d.textBaseline = "middle";
+  ctx2d.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
+}
+
+const btns = {};
+function hitBtn(rect, x, y) { return rect && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h; }
+
+// -------- Main render loop --------
+let particles = new FireParticles(layout.particleMax);
+let lastFrame = performance.now();
+let lastModeForImps = -1;
+let lastSceneSig = "";
+let currentImps = [];
+
+function bottomBarHeight() {
+  // If the FX rack is visible, let the scene stop above it.
+  const fx = document.getElementById("fxRack");
+  if (fx && !fx.classList.contains("hidden")) {
+    const r = fx.getBoundingClientRect();
+    if (r && r.height > 0 && r.top > 0) return Math.max(0, H - r.top);
+  }
+  return layout.btnRows * layout.btnH + (layout.btnRows + 1) * 8 + layout.safeBottom;
+}
+const SCENE_W = 900, SCENE_H = 540;
+function fitScene() {
+  const availW = W;
+  const availH = Math.max(120, H - bottomBarHeight() - 8);
+  const s = Math.max(0.32, Math.min(availW / SCENE_W, availH / SCENE_H));
+  const dx = (availW - SCENE_W * s) / 2;
+  const dy = Math.max(0, (availH - SCENE_H * s) / 2);
+  return { s, dx, dy };
+}
+
+function getPulse() {
+  if (!analyser) return 0;
+  analyser.getFloatTimeDomainData(analyserBuf);
+  let s = 0;
+  for (let i = 0; i < analyserBuf.length; i++) s += analyserBuf[i] * analyserBuf[i];
+  const rms = Math.sqrt(s / analyserBuf.length);
+  return Math.min(1, rms / 0.3);
+}
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
+  lastFrame = now;
+  const t = now / 1000;
+
+  // display snapshot
+  const audioT = ctx ? ctx.currentTime : 0;
+  const disp = (state.lastDisplay.endT > audioT - 0.1) ? state.lastDisplay : { name: "-", freq: 0, endT: 0 };
+  const freq = disp.freq;
+  const hue = (freq > 0) ? logFreqToHue(freq) : ((t * 0.1) % 1);
+  const pulse = getPulse();
+
+  // Recompute imps when mode or scene size changes
+  const sceneSig = `${state.mode}|${SCENE_W}x${SCENE_H}`;
+  if (state.mode !== lastModeForImps || sceneSig !== lastSceneSig) {
+    currentImps = impsForMode(state.mode, SCENE_W, SCENE_H);
+    lastModeForImps = state.mode;
+    lastSceneSig = sceneSig;
+  }
+
+  // Scene drawn in logical 900x540 coords, fit-scaled into available area
+  ctx2d.clearRect(0, 0, W, H);
+  const fit = fitScene();
+  ctx2d.save();
+  ctx2d.translate(fit.dx, fit.dy);
+  ctx2d.scale(fit.s, fit.s);
+  drawBackground(ctx2d, t, pulse, SCENE_W, SCENE_H);
+  drawGroundCracks(ctx2d, t, pulse, SCENE_W, SCENE_H);
+  drawSpeaker(ctx2d, SCENE_W * 0.16, SCENE_H * 0.45, hue, pulse, t, particles);
+  drawSpeaker(ctx2d, SCENE_W * 0.84, SCENE_H * 0.45, (hue + 0.33) % 1, pulse, t, particles);
+  drawDevil(ctx2d, SCENE_W / 2, SCENE_H * 0.40, pulse, t, particles);
+  for (const imp of currentImps) imp.draw(ctx2d, t, pulse, particles);
+  particles.update(dt);
+  particles.draw(ctx2d);
+  ctx2d.restore();
+
+  // HUD (in screen coords)
+  const titleSize = (layout.device === "mobile") ? 18 : 22;
+  const hudSize   = (layout.device === "mobile") ? 12 : 14;
+  ctx2d.fillStyle = "#fcd77c";
+  ctx2d.font = `bold ${titleSize}px Menlo, Consolas, monospace`;
+  ctx2d.textAlign = "center"; ctx2d.textBaseline = "top";
+  ctx2d.fillText(modeLabels[state.mode], W / 2, 8 + layout.safeTop);
+
+  ctx2d.fillStyle = "#d0d0c8";
+  ctx2d.font = `${hudSize}px Menlo, Consolas, monospace`;
+  ctx2d.textAlign = "left";
+  const freqStr = freq.toFixed(1);
+  const hud = (layout.device === "mobile")
+    ? `${disp.name}  ${freqStr}Hz  ${state.output}`
+    : `voice: ${disp.name.padEnd(8)}  freq: ${freqStr.padStart(7)} Hz  out: ${state.output}`;
+  ctx2d.fillText(hud, 16, 8 + titleSize + 8 + layout.safeTop);
+
+  drawButtons(ctx2d, pulse);
+
+  requestAnimationFrame(frame);
+}
+
+// =========================================================================
+// INPUT
+// =========================================================================
+const overlay = document.getElementById("overlay");
+const pwForm = document.getElementById("pwForm");
+const pwInput = document.getElementById("pwInput");
+const pwError = document.getElementById("pwError");
+const deviceToggle = document.getElementById("deviceToggle");
+const deviceCaption = document.getElementById("deviceCaption");
+const volumeHint = document.getElementById("volumeHint");
+const hint = document.getElementById("hint");
+const fxRack = document.getElementById("fxRack");
+const recBtn = document.getElementById("recBtn");
+const recInfo = document.getElementById("recInfo");
+
+function haptic(ms) {
+  if (layout.device === "mobile" && navigator.vibrate) {
+    try { navigator.vibrate(ms || 12); } catch(e){}
+  }
+}
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function toggleFullscreen() {
+  const el = document.documentElement;
+  if (!isFullscreen()) {
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) { try { req.call(el); } catch(e){} }
+  } else {
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) { try { exit.call(document); } catch(e){} }
+  }
+}
+
+function refreshDeviceUi() {
+  for (const pill of deviceToggle.querySelectorAll(".devPill")) {
+    pill.classList.toggle("active", pill.dataset.dev === layout.device);
+  }
+  if (deviceCaption) {
+    const auto = layout.detected;
+    deviceCaption.textContent = `auto-detected: ${auto.toUpperCase()}` + (layout.device !== auto ? "  ·  manual override" : "");
+  }
+  if (hint) {
+    hint.textContent = (layout.device === "mobile")
+      ? "Tap · M1-M4 · MONO · FS · WAV/WEBM · REC · QUIT"
+      : "SPACE=play · 1/2/3/4=mode · M=mono/stereo · R=rec (WAV/WEBM) · ESC=re-lock";
+  }
+}
+
+deviceToggle.addEventListener("click", (e) => {
+  const t = e.target.closest(".devPill");
+  if (!t) return;
+  const choice = t.dataset.dev;
+  if (choice !== "mobile" && choice !== "desktop") return;
+  layout.device = choice;
+  saveDevice(choice);
+  applyDeviceLayout();
+  // Live-resize state that depends on layout
+  particles = new FireParticles(layout.particleMax);
+  resize();
+  refreshDeviceUi();
+});
+
+function showVolumeHint() {
+  if (!volumeHint) return;
+  volumeHint.classList.add("visible");
+  setTimeout(() => { volumeHint.classList.remove("visible"); }, 3500);
+}
+
+async function unlock() {
+  overlay.classList.add("hidden");
+  pwInput.blur();
+  setTimeout(() => { if (overlay.classList.contains("hidden")) overlay.style.display = "none"; }, 900);
+  await ensureAudio();
+  applyFx(true);
+  setPlaying(true);
+  fxRack.classList.remove("hidden");
+  haptic(20);
+  if (layout.device === "mobile") showVolumeHint();
+}
+
+pwForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (pwInput.value === PASSWORD) {
+    pwError.textContent = "";
+    try { await unlock(); } catch(err) { pwError.textContent = "audio error: " + (err && err.message || err); }
+  } else {
+    pwError.textContent = "WRONG WORD. TRY AGAIN.";
+    pwInput.classList.remove("shake");
+    void pwInput.offsetWidth;
+    pwInput.classList.add("shake");
+    pwInput.value = "";
+    haptic(40);
+  }
+});
+
+function reLock() {
+  if (recState !== undefined && recState !== 0) stopRecording();
+  setPlaying(false);
+  fxRack.classList.add("hidden");
+  overlay.style.display = "flex";
+  requestAnimationFrame(() => overlay.classList.remove("hidden"));
+  pwInput.value = "";
+  pwError.textContent = "";
+  refreshDeviceUi();
+  setTimeout(() => pwInput.focus(), 50);
+}
+
+window.addEventListener("keydown", (e) => {
+  if (!overlay.classList.contains("hidden")) return;
+  if (e.code === "Space")      { e.preventDefault(); setPlaying(!state.playing); haptic(); }
+  else if (e.key === "1")      { setMode(1); haptic(); }
+  else if (e.key === "2")      { setMode(2); haptic(); }
+  else if (e.key === "3")      { setMode(3); haptic(); }
+  else if (e.key === "4")      { setMode(4); haptic(); }
+  else if (e.key === "m" || e.key === "M") { setMonoOutput(state.output !== "mono"); haptic(); }
+  else if (e.key === "Escape") reLock();
+});
+
+canvas.addEventListener("pointerdown", (e) => {
+  if (!overlay.classList.contains("hidden")) return;
+  e.preventDefault();
+  const x = e.clientX, y = e.clientY;
+  if (hitBtn(btns.play, x, y))      { setPlaying(!state.playing); haptic(); }
+  else if (hitBtn(btns.m1, x, y))   { setMode(1); haptic(); }
+  else if (hitBtn(btns.m2, x, y))   { setMode(2); haptic(); }
+  else if (hitBtn(btns.m3, x, y))   { setMode(3); haptic(); }
+  else if (hitBtn(btns.m4, x, y))   { setMode(4); haptic(); }
+  else if (hitBtn(btns.out, x, y))  { setMonoOutput(state.output !== "mono"); haptic(); }
+  else if (btns.fs && hitBtn(btns.fs, x, y)) { toggleFullscreen(); haptic(); }
+  else if (hitBtn(btns.quit, x, y)) { reLock(); haptic(); }
+});
+
+// Resume audio after backgrounding (mobile multitasking)
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && ctx && ctx.state === "suspended" && state.playing) {
+    ctx.resume();
+  }
+});
+
+// Re-fit on entering/leaving fullscreen
+document.addEventListener("fullscreenchange", resize);
+document.addEventListener("webkitfullscreenchange", resize);
+
+// ---------------------- FX sliders ----------------------
+const fxSliderSpecs = [
+  { id: "fxVolume", valId: "fxVolumeVal", key: "volume", fmt: (v) => v.toFixed(2) + "×" },
+  { id: "fxReverb", valId: "fxReverbVal", key: "reverb", fmt: (v) => v.toFixed(2) },
+  { id: "fxDelay",  valId: "fxDelayVal",  key: "delay",  fmt: (v) => v.toFixed(2) },
+  { id: "fxCrush",  valId: "fxCrushVal",  key: "crush",  fmt: (v) => v.toFixed(2) },
+];
+for (const s of fxSliderSpecs) {
+  const el = document.getElementById(s.id);
+  const vl = document.getElementById(s.valId);
+  if (!el || !vl) continue;
+  el.value = state.fx[s.key];
+  vl.textContent = s.fmt(state.fx[s.key]);
+  el.addEventListener("input", () => {
+    const v = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), parseFloat(el.value)));
+    state.fx[s.key] = v;
+    vl.textContent = s.fmt(v);
+    applyFx();
+    persistFx();
+  });
+}
+
+// ---------------------- Recording (WAV + WEBM) ----------------------
+const REC_FMT_KEY = "toneOracleRecFmt_v1";
+const RECORDING_STATE = { idle: 0, webm: 1, wav: 2 };
+let recState = RECORDING_STATE.idle;
+let recFormat = "wav";
+try { const v = localStorage.getItem(REC_FMT_KEY); if (v === "wav" || v === "webm") recFormat = v; } catch(e){}
+
+// --- WEBM (MediaRecorder) ---
+let recorder = null;
+let recChunks = [];
+let recMime = "";
+let recStart = 0;
+let recTimerHandle = null;
+
+function pickRecMime() {
+  if (typeof MediaRecorder === "undefined") return null;
+  if (!MediaRecorder.isTypeSupported) return "";
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4;codecs=mp4a.40.2",
+    "audio/mp4",
+    "audio/ogg;codecs=opus",
+  ];
+  for (const m of candidates) {
+    try { if (MediaRecorder.isTypeSupported(m)) return m; } catch(e){}
+  }
+  return "";
+}
+
+// --- WAV (PCM capture via ScriptProcessor tap) ---
+let wavCaptureNode = null;
+let wavCaptureSilent = null;
+let wavCapturing = false;
+let wavBufsL = [];
+let wavBufsR = [];
+let wavSampleRate = 48000;
+
+function ensureWavCaptureNode() {
+  if (!ctx) return false;
+  if (wavCaptureNode) return true;
+  try {
+    const BUF = 4096;
+    wavCaptureNode = ctx.createScriptProcessor(BUF, 2, 2);
+    wavCaptureNode.onaudioprocess = (e) => {
+      const inL = e.inputBuffer.getChannelData(0);
+      const inR = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : inL;
+      if (wavCapturing) {
+        wavBufsL.push(new Float32Array(inL));
+        wavBufsR.push(new Float32Array(inR));
+      }
+      // pass-through (keeps node active)
+      e.outputBuffer.getChannelData(0).set(inL);
+      e.outputBuffer.getChannelData(1).set(inR);
+    };
+    wavCaptureSilent = ctx.createGain();
+    wavCaptureSilent.gain.value = 0;  // tap is silent (original signal still reaches destination)
+    compressor.connect(wavCaptureNode);
+    wavCaptureNode.connect(wavCaptureSilent);
+    wavCaptureSilent.connect(ctx.destination);
+    return true;
+  } catch(e) { wavCaptureNode = null; return false; }
+}
+
+// Encode a list of Float32 blocks (L+R) into a WAV Blob, 16-bit PCM, ctx.sampleRate.
+function encodeWavBlob(bufsL, bufsR, sampleRate) {
+  const total = bufsL.reduce((s, b) => s + b.length, 0);
+  if (total === 0) return null;
+  const pcm = new Int16Array(total * 2);
+  let pi = 0;
+  for (let i = 0; i < bufsL.length; i++) {
+    const l = bufsL[i], r = bufsR[i] || l;
+    const len = l.length;
+    for (let j = 0; j < len; j++) {
+      let sl = l[j]; if (sl > 1) sl = 1; else if (sl < -1) sl = -1;
+      let sr = r[j]; if (sr > 1) sr = 1; else if (sr < -1) sr = -1;
+      // Symmetric conversion so +1.0 → 32767 (avoids DC offset at peaks)
+      pcm[pi++] = (sl * 32767) | 0;
+      pcm[pi++] = (sr * 32767) | 0;
+    }
+  }
+  const byteLen = pcm.byteLength;
+  const header = 44;
+  const buf = new ArrayBuffer(header + byteLen);
+  const v = new DataView(buf);
+  function wstr(off, s) { for (let k = 0; k < s.length; k++) v.setUint8(off + k, s.charCodeAt(k)); }
+  wstr(0, "RIFF");
+  v.setUint32(4, 36 + byteLen, true);
+  wstr(8, "WAVE");
+  wstr(12, "fmt ");
+  v.setUint32(16, 16, true);        // fmt chunk size
+  v.setUint16(20, 1, true);         // PCM
+  v.setUint16(22, 2, true);         // channels
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 4, true); // byte rate = sr * channels * bytesPerSample
+  v.setUint16(32, 4, true);         // block align = channels * bytesPerSample
+  v.setUint16(34, 16, true);        // bits per sample
+  wstr(36, "data");
+  v.setUint32(40, byteLen, true);
+  new Int16Array(buf, header).set(pcm);
+  return new Blob([buf], { type: "audio/wav" });
+}
+
+function downloadBlob(blob, ext) {
+  const url = URL.createObjectURL(blob);
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `tone-oracle-${ts}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 3000);
+}
+
+// --- timer + UI ---
+function updateRecInfo() {
+  if (recState === RECORDING_STATE.idle) return;
+  const sec = Math.floor((performance.now() - recStart) / 1000);
+  const m = Math.floor(sec / 60), s = sec % 60;
+  recInfo.textContent = `● ${m}:${s.toString().padStart(2, "0")}`;
+}
+
+// --- Start / stop, branched by format ---
+function startRecording() {
+  if (!ctx) { recInfo.textContent = "n/a"; return; }
+  if (recFormat === "wav") {
+    if (!ensureWavCaptureNode()) { recInfo.textContent = "no PCM tap"; return; }
+    wavSampleRate = ctx.sampleRate;
+    wavBufsL = []; wavBufsR = [];
+    wavCapturing = true;
+    recState = RECORDING_STATE.wav;
+  } else {
+    if (!streamDest) { recInfo.textContent = "n/a"; return; }
+    const mime = pickRecMime();
+    if (mime === null) { recInfo.textContent = "n/a"; return; }
+    recMime = mime;
+    try {
+      recorder = mime ? new MediaRecorder(streamDest.stream, { mimeType: mime })
+                      : new MediaRecorder(streamDest.stream);
+    } catch (e) {
+      try { recorder = new MediaRecorder(streamDest.stream); recMime = ""; }
+      catch (ee) { recInfo.textContent = "error"; return; }
+    }
+    recChunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recChunks.push(e.data); };
+    recorder.onstop = () => {
+      try {
+        const blob = new Blob(recChunks, { type: recMime || "audio/webm" });
+        const ext = recMime.includes("mp4") ? "m4a" : recMime.includes("ogg") ? "ogg" : "webm";
+        downloadBlob(blob, ext);
+      } catch(e) {}
+    };
+    recorder.start();
+    recState = RECORDING_STATE.webm;
+  }
+  recStart = performance.now();
+  recBtn.classList.add("recording");
+  recBtn.textContent = "■ STOP";
+  setRecFmtPillsEnabled(false);
+  if (recTimerHandle) clearInterval(recTimerHandle);
+  recTimerHandle = setInterval(updateRecInfo, 250);
+  updateRecInfo();
+  haptic(30);
+}
+
+function stopRecording() {
+  if (recState === RECORDING_STATE.idle) return;
+  if (recState === RECORDING_STATE.wav) {
+    wavCapturing = false;
+    try {
+      const blob = encodeWavBlob(wavBufsL, wavBufsR, wavSampleRate);
+      if (blob) downloadBlob(blob, "wav");
+    } catch(e){}
+    wavBufsL = []; wavBufsR = [];
+  } else if (recState === RECORDING_STATE.webm && recorder) {
+    try { recorder.stop(); } catch(e){}
+  }
+  recState = RECORDING_STATE.idle;
+  recBtn.classList.remove("recording");
+  recBtn.textContent = "● REC";
+  if (recTimerHandle) { clearInterval(recTimerHandle); recTimerHandle = null; }
+  recInfo.textContent = "saved";
+  setRecFmtPillsEnabled(true);
+  setTimeout(() => { if (recInfo.textContent === "saved") recInfo.textContent = ""; }, 2500);
+  haptic(30);
+}
+
+function toggleRecording() {
+  if (recState !== RECORDING_STATE.idle) stopRecording();
+  else startRecording();
+}
+
+// --- Format pills ---
+function refreshRecFmtPills() {
+  const pills = document.querySelectorAll(".fmtPill");
+  for (const p of pills) p.classList.toggle("active", p.dataset.fmt === recFormat);
+}
+function setRecFmtPillsEnabled(enabled) {
+  const pills = document.querySelectorAll(".fmtPill");
+  for (const p of pills) {
+    p.classList.toggle("disabled", !enabled);
+    p.disabled = !enabled;
+  }
+}
+function wireRecFmtPills() {
+  const pills = document.querySelectorAll(".fmtPill");
+  for (const p of pills) {
+    p.addEventListener("click", () => {
+      if (recState !== RECORDING_STATE.idle) return;
+      const f = p.dataset.fmt;
+      if (f === "webm" && typeof MediaRecorder === "undefined") return;
+      recFormat = f;
+      try { localStorage.setItem(REC_FMT_KEY, recFormat); } catch(e){}
+      refreshRecFmtPills();
+    });
+  }
+  refreshRecFmtPills();
+  // Disable WEBM pill if MediaRecorder unavailable
+  if (typeof MediaRecorder === "undefined") {
+    const webmPill = document.querySelector('.fmtPill[data-fmt="webm"]');
+    if (webmPill) {
+      webmPill.classList.add("disabled");
+      webmPill.disabled = true;
+      webmPill.title = "WEBM not supported in this browser";
+    }
+    if (recFormat === "webm") { recFormat = "wav"; refreshRecFmtPills(); }
+  }
+}
+wireRecFmtPills();
+
+if (recBtn) recBtn.addEventListener("click", toggleRecording);
+
+// Add R keyboard shortcut to toggle recording (after unlock)
+window.addEventListener("keydown", (e) => {
+  if (!overlay.classList.contains("hidden")) return;
+  if (e.key === "r" || e.key === "R") {
+    if (!recBtn.disabled) toggleRecording();
+  }
+});
+
+refreshDeviceUi();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
