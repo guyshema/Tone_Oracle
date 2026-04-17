@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0208">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Tone Oracle — a collection of real-time random sound generators with hellish visuals, multilingual speech, and submarine signals. Built with Web Audio API.">
+<title>Tone Oracle — Random Sound Machines</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:#0a0208;color:#e8e0d0;font-family:'Courier New','Menlo',monospace;line-height:1.6;min-height:100vh;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+a{color:inherit;text-decoration:none}
+
+/* HERO */
+.hero{text-align:center;padding:60px 20px 40px;background:radial-gradient(ellipse at center,#1a0508 0%,#0a0208 70%)}
+.hero h1{font-size:2.4rem;letter-spacing:.6rem;color:#d13a2e;text-shadow:0 0 40px rgba(209,58,46,.3);margin-bottom:8px}
+.hero .sub{font-size:.75rem;letter-spacing:.25rem;color:#7a6a5a;margin-bottom:24px}
+.hero .url{font-size:.6rem;color:#5a4a3a;letter-spacing:.1rem}
+
+/* CARDS */
+.cards{display:flex;flex-direction:column;gap:20px;padding:20px;max-width:800px;margin:0 auto}
+.card{background:linear-gradient(135deg,#12101a 0%,#0e0c14 100%);border:1px solid #2a1a2a;border-radius:16px;overflow:hidden;transition:transform .2s,border-color .3s}
+.card:hover{transform:translateY(-2px)}
+.card.devil{border-color:#3a1a18}.card.devil:hover{border-color:#d13a2e}
+.card.neighbor{border-color:#1a2a3a}.card.neighbor:hover{border-color:#f0c040}
+.card.spy{border-color:#0a2a1a}.card.spy:hover{border-color:#30ff60}
+.card-header{padding:24px 20px 16px;display:flex;align-items:center;gap:16px}
+.card-icon{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0}
+.card.devil .card-icon{background:radial-gradient(circle,#3a1a18,#1a0a08);border:2px solid #d13a2e}
+.card.neighbor .card-icon{background:radial-gradient(circle,#1a2a3a,#0a1020);border:2px solid #f0c040}
+.card.spy .card-icon{background:radial-gradient(circle,#0a2a1a,#041208);border:2px solid #30ff60}
+.card-title{font-size:1.1rem;letter-spacing:.2rem;font-weight:700}
+.card.devil .card-title{color:#d13a2e}
+.card.neighbor .card-title{color:#f0c040}
+.card.spy .card-title{color:#30ff60}
+.card-edition{font-size:.5rem;letter-spacing:.15rem;color:#5a5a6a;margin-top:2px}
+.card-body{padding:0 20px 20px}
+.card-desc{font-size:.7rem;color:#a09890;margin-bottom:14px;line-height:1.7}
+.card-modes{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:16px}
+.mode-tag{padding:3px 8px;border-radius:10px;font-size:.5rem;letter-spacing:.05rem;border:1px solid #2a2a3a;color:#7a7a8a;background:#0a0a14}
+.card.devil .mode-tag{border-color:#2a1a18;color:#c08070}
+.card.neighbor .mode-tag{border-color:#1a2a1a;color:#b0a070}
+.card.spy .mode-tag{border-color:#0a2a1a;color:#70b080}
+.enter-btn{display:inline-block;padding:12px 28px;border-radius:8px;font-family:inherit;font-size:.75rem;font-weight:700;letter-spacing:.2rem;text-align:center;transition:all .2s;cursor:pointer;border:2px solid}
+.card.devil .enter-btn{background:#1a0a08;color:#d13a2e;border-color:#d13a2e}
+.card.devil .enter-btn:hover{background:#d13a2e;color:#fff}
+.card.neighbor .enter-btn{background:#0a1020;color:#f0c040;border-color:#f0c040}
+.card.neighbor .enter-btn:hover{background:#f0c040;color:#000}
+.card.spy .enter-btn{background:#041208;color:#30ff60;border-color:#30ff60}
+.card.spy .enter-btn:hover{background:#30ff60;color:#000}
+
+/* FEATURES */
+.features{padding:40px 20px;max-width:800px;margin:0 auto}
+.features h2{font-size:1rem;letter-spacing:.3rem;color:#d13a2e;margin-bottom:20px;text-align:center;border-bottom:1px solid #1a1a2a;padding-bottom:8px}
+.feat-section{margin-bottom:30px}
+.feat-section h3{font-size:.8rem;letter-spacing:.15rem;margin-bottom:8px}
+.feat-section h3.devil{color:#d13a2e}.feat-section h3.neighbor{color:#f0c040}.feat-section h3.spy{color:#30ff60}.feat-section h3.shared{color:#a0a0b0}
+.feat-section p,.feat-section li{font-size:.65rem;color:#9a9a9a;line-height:1.7;margin-bottom:4px}
+.feat-section ul{padding-left:16px;margin-bottom:8px}
+.feat-section .highlight{color:#e0d0c0}
+
+/* SHARED FX INFO */
+.fx-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.fx-item{background:#0a0a14;border:1px solid #1a1a2a;border-radius:8px;padding:8px 10px}
+.fx-item .name{font-size:.55rem;font-weight:700;color:#c0b8a8;letter-spacing:.1rem}
+.fx-item .desc{font-size:.5rem;color:#7a7a8a;margin-top:2px}
+
+/* FOOTER */
+.footer{text-align:center;padding:30px 20px 40px;border-top:1px solid #1a1a2a;margin-top:20px}
+.footer p{font-size:.55rem;color:#4a4a5a;letter-spacing:.1rem;margin-bottom:4px}
+.footer .pw{color:#5a3a3a;font-size:.5rem;margin-top:8px}
+
+/* PASSWORD HINT */
+.pw-hint{text-align:center;padding:10px;font-size:.55rem;color:#3a2a2a;letter-spacing:.1rem}
+
+@media(min-width:600px){
+  .cards{flex-direction:row;flex-wrap:wrap}
+  .card{flex:1;min-width:240px}
+  .fx-grid{grid-template-columns:1fr 1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <h1>TONE ORACLE</h1>
+  <div class="sub">REAL-TIME RANDOM SOUND MACHINES</div>
+  <div class="url">tone-oracle.guyshema.com</div>
+</div>
+
+<!-- THREE ORACLE CARDS -->
+<div class="cards">
+
+  <!-- CARD 1: TONE ORACLE (Devil) -->
+  <div class="card devil">
+    <div class="card-header">
+      <div class="card-icon">👹</div>
+      <div>
+        <div class="card-title">TONE ORACLE</div>
+        <div class="card-edition">THE DEVIL</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">A hellish random tone generator. 15 oscillator voice types — sine, sawtooth, square, pulse, triangle, white noise, pink noise, FM synthesis, ring modulation, frequency sweeps, clicks, detuned stacks, glitch gates, and tremolo — fired in random combinations at random intervals. The devil watches over it all with glowing fiery eyes.</p>
+      <div class="card-modes">
+        <span class="mode-tag">PURE SINE</span>
+        <span class="mode-tag">NOISE MACHINE</span>
+        <span class="mode-tag">ALL TOGETHER</span>
+        <span class="mode-tag">CACOPHONY</span>
+      </div>
+      <a href="TONE.html" class="enter-btn">ENTER THE HELL</a>
+    </div>
+  </div>
+
+  <!-- CARD 2: BABEL ORACLE (Neighbor) -->
+  <div class="card neighbor">
+    <div class="card-header">
+      <div class="card-icon">😰</div>
+      <div>
+        <div class="card-title">BABEL ORACLE</div>
+        <div class="card-edition">THE NEIGHBOR</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">Random nonsense speech in 22 languages — English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Korean, Arabic, Hindi, Turkish, Dutch, Swedish, Polish, Hebrew, Thai, Vietnamese, Indonesian, Greek, and Czech. Each word sounds intentional but means nothing. A desperate neighbor on a balcony with bloodshot red eyes watches the babel unfold. City sounds, formant-synthesized robot voice, and a podcast mode where two hosts argue in gibberish.</p>
+      <div class="card-modes">
+        <span class="mode-tag">WORDS</span>
+        <span class="mode-tag">SENTENCES</span>
+        <span class="mode-tag">BABEL</span>
+        <span class="mode-tag">PODCAST</span>
+        <span class="mode-tag">CITY</span>
+        <span class="mode-tag">CHAOS</span>
+        <span class="mode-tag">ROBOT</span>
+      </div>
+      <a href="BabelOracle.html" class="enter-btn">OPEN THE GATES</a>
+    </div>
+  </div>
+
+  <!-- CARD 3: DEPTH SIGNAL (Spy) -->
+  <div class="card spy">
+    <div class="card-header">
+      <div class="card-icon">🕵️</div>
+      <div>
+        <div class="card-title">DEPTH SIGNAL</div>
+        <div class="card-edition">LIMITED EDITION — THE SPY</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p class="card-desc">A submarine signal generator. Morse code beeps, shortwave radio static, electrical equipment hum, sonar pings with echo, dolphin clicks and whistles, owl hoots, ultra-low drones, whale calls, and ultra-random frequency sweeps from 2 to 20 seconds across the full audible range. A spy in a fedora and trench coat stands watch inside the submarine control room, surrounded by sonar screens and gauge panels. All sounds pre-generated in a buffer pool for glitch-free playback.</p>
+      <div class="card-modes">
+        <span class="mode-tag">MORSE</span>
+        <span class="mode-tag">RADIO</span>
+        <span class="mode-tag">ELECTRICAL</span>
+        <span class="mode-tag">SONAR</span>
+        <span class="mode-tag">DOLPHIN</span>
+        <span class="mode-tag">OWL</span>
+        <span class="mode-tag">DEEP</span>
+        <span class="mode-tag">ABYSS</span>
+        <span class="mode-tag">SWEEP</span>
+        <span class="mode-tag">SIGNAL</span>
+        <span class="mode-tag">ALL</span>
+      </div>
+      <a href="Depth.html" class="enter-btn">DESCEND</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- PASSWORD HINT -->
+<div class="pw-hint">All oracles require a password to enter. The word is spoken in whispers.</div>
+
+<!-- FEATURES / MANUAL -->
+<div class="features">
+  <h2>USER MANUAL</h2>
+
+  <div class="feat-section">
+    <h3 class="devil">TONE ORACLE — The Devil</h3>
+    <p>A real-time random oscillator engine that generates unpredictable tones using 15 different voice types. Each event has a randomly chosen frequency (20–7000 Hz, log-uniform distribution), duration (40–2000 ms), amplitude, and stereo pan. No two moments sound the same.</p>
+    <p><span class="highlight">15 Voice Types:</span> Sine, Sawtooth (2× oversampled with polyBLEP anti-aliasing), Square, Pulse (variable duty cycle via PeriodicWave), Triangle, White Noise, Pink Noise (Paul Kellet filter), Filtered Noise Burst (resonant bandpass), FM Synthesis (carrier + modulator with random ratio and index), Ring Modulation, Exponential Chirp, Percussive Click, Detuned Stack (3–5 beating sines), Glitch (gated at random rate), Tremolo Sine.</p>
+    <ul>
+      <li><span class="highlight">Mode 1 — Pure Sine:</span> One clean sine tone at a time, long meditative gaps.</li>
+      <li><span class="highlight">Mode 2 — Noise Machine:</span> Random voice type per event. The full variety.</li>
+      <li><span class="highlight">Mode 3 — All Together:</span> 4 parallel voice slots, each independently scheduling random voices.</li>
+      <li><span class="highlight">Mode 4 — Cacophony:</span> 6 parallel slots with heavy-tailed gap distribution (bursts, long silences, maximum chaos).</li>
+    </ul>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="neighbor">BABEL ORACLE — The Neighbor</h3>
+    <p>Generates phonotactically valid nonsense words in 22 languages using language-specific syllable inventories (onset consonants + vowels + codas). Each language has its own connector words for natural sentence flow. Speech is produced via the browser's SpeechSynthesis API with automatic voice discovery — the correct accent and prosody for each language comes free.</p>
+    <ul>
+      <li><span class="highlight">Mode 1 — Words:</span> Single words, each in a random language, long gaps. Meditative.</li>
+      <li><span class="highlight">Mode 2 — Sentences:</span> Full sentences (3–8 words), each in a random language.</li>
+      <li><span class="highlight">Mode 3 — Babel:</span> Rapid-fire words with very short gaps. Tower of Babel.</li>
+      <li><span class="highlight">Mode 4 — Podcast:</span> Two persistent hosts with fixed voices alternate sentences. Re-rolled every 8 exchanges.</li>
+      <li><span class="highlight">Mode 5 — City:</span> 11 urban sound generators — cars, horns, sirens, hammering, dogs, birds, footsteps, wind, doors, crowd chatter, trains.</li>
+      <li><span class="highlight">Mode 6 — Chaos:</span> Babel speech + City sounds combined.</li>
+      <li><span class="highlight">Mode 7 — Robot:</span> Formant-synthesized speech routed through the FX chain. 3-pole biquad bandpass resonators per phoneme. All effects process the voice directly.</li>
+    </ul>
+    <p><span class="highlight">22 Languages:</span> English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Korean, Arabic, Hindi, Turkish, Dutch, Swedish, Polish, Hebrew, Thai, Vietnamese, Indonesian, Greek, Czech.</p>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="spy">DEPTH SIGNAL — The Spy (Limited Edition)</h3>
+    <p>13 procedural signal generators inspired by submarine communications, marine life, and deep-sea ambience. All sounds are pre-generated into a buffer pool at initialization for glitch-free real-time playback — no main-thread blocking during performance.</p>
+    <ul>
+      <li><span class="highlight">Morse:</span> Random dit/dah beeps at random pitch (400–1200 Hz).</li>
+      <li><span class="highlight">Radio:</span> Shortwave static + tuning sweeps + crackling.</li>
+      <li><span class="highlight">Electrical:</span> Transformer hum, relay clicks, spark crackle, capacitor whine.</li>
+      <li><span class="highlight">Sonar:</span> Classic submarine pings with exponential decay and faint echo returns.</li>
+      <li><span class="highlight">Dolphin:</span> Click trains (5–15 clicks accelerating) and whistles (sine sweep 4–18 kHz).</li>
+      <li><span class="highlight">Owl:</span> Low hoots with pitch drop, screech owl calls, cricket chirps.</li>
+      <li><span class="highlight">Deep:</span> All types mixed (4 concurrent slots).</li>
+      <li><span class="highlight">Abyss:</span> Ultra-low drones (20–60 Hz), metallic groans (FM synthesis), pressure creaks, whale calls (slow sine glide 40–200 Hz over 5–10 seconds).</li>
+      <li><span class="highlight">Sweep:</span> Ultra-random frequency sweeps: 2–20 seconds, any waveform (sine/saw/square/triangle/noise-modulated), any direction, any envelope.</li>
+      <li><span class="highlight">Signal:</span> Morse + Sonar cacophonic conversation (4 slots).</li>
+      <li><span class="highlight">All:</span> Every generator simultaneously (5 slots). Maximum submarine pandemonium.</li>
+    </ul>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="shared">SHARED FX ENGINE</h3>
+    <p>All three oracles share the same professional-grade effects chain, built with the Web Audio API:</p>
+    <div class="fx-grid">
+      <div class="fx-item"><div class="name">REVERB</div><div class="desc">Convolution reverb with 2-second synthetic impulse response. Anti-alias lowpass at 9.5 kHz on the wet return.</div></div>
+      <div class="fx-item"><div class="name">DELAY</div><div class="desc">350 ms feedback delay with tape-style darkening (6.5 kHz lowpass inside the feedback loop).</div></div>
+      <div class="fx-item"><div class="name">8-BIT</div><div class="desc">Bitcrusher via AudioWorklet — reduces bit depth (16→3) and sample rate simultaneously. WaveShaper fallback for older browsers.</div></div>
+      <div class="fx-item"><div class="name">HI CUT / LO CUT</div><div class="desc">BiquadFilter EQ. Lowpass 200–20000 Hz, Highpass 20–2000 Hz.</div></div>
+      <div class="fx-item"><div class="name">SOFT CLIPPER</div><div class="desc">WaveShaper with 4× oversampling. Transparent below ±0.7, smooth tanh saturation above.</div></div>
+      <div class="fx-item"><div class="name">RECORDING</div><div class="desc">WAV (16-bit PCM via ScriptProcessor) or WEBM (MediaRecorder). Auto-download on stop.</div></div>
+    </div>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="shared">BACKGROUND NOISE</h3>
+    <p>8 switchable ambient noise types, each with a per-type anti-alias filter:</p>
+    <ul>
+      <li><span class="highlight">Brown:</span> Warm low rumble (lowpass 200 Hz).</li>
+      <li><span class="highlight">Pink:</span> Balanced 1/f spectrum.</li>
+      <li><span class="highlight">Rain:</span> Bandpass-filtered noise with random drops.</li>
+      <li><span class="highlight">Wind:</span> Slowly modulated low-frequency swell.</li>
+      <li><span class="highlight">Street:</span> Low rumble + horn pings + distant hiss.</li>
+      <li><span class="highlight">Night:</span> Soft noise + dual cricket chirps (4.2 / 3.8 kHz).</li>
+      <li><span class="highlight">Hum:</span> 50 Hz mains + harmonics.</li>
+      <li><span class="highlight">Off:</span> Complete silence.</li>
+    </ul>
+    <p>Plus a persistent <span class="highlight">60 Hz drone</span> with 0.3 Hz LFO tremolo, independently controllable.</p>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="shared">KEYBOARD SHORTCUTS</h3>
+    <ul>
+      <li><span class="highlight">SPACE</span> — Play / Stop</li>
+      <li><span class="highlight">1–9, 0, -</span> — Select mode</li>
+      <li><span class="highlight">M</span> — Mute / Unmute</li>
+      <li><span class="highlight">N</span> — Mono / Stereo</li>
+      <li><span class="highlight">R</span> — Record / Stop recording</li>
+      <li><span class="highlight">ESC</span> — Re-lock</li>
+    </ul>
+  </div>
+
+  <div class="feat-section">
+    <h3 class="shared">TECHNICAL NOTES</h3>
+    <ul>
+      <li>100% client-side — zero server dependencies, runs from a single HTML file.</li>
+      <li>Web Audio API for all synthesis and effects processing.</li>
+      <li>Anti-aliasing: polyBLEP on saw/square/pulse (Tone Oracle), 2× oversampling + FIR lowpass, AA lowpass on all three FX wet returns, 4× WaveShaper oversample on the soft clipper.</li>
+      <li>Buffer pool system (Depth Signal) pre-generates audio for glitch-free playback.</li>
+      <li>Responsive design — works on desktop and mobile browsers.</li>
+      <li>Works offline from local files.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <p>TONE ORACLE — by Guy Shema</p>
+  <p>Built with Web Audio API · Canvas 2D · SpeechSynthesis</p>
+  <p class="pw">All oracles require a password to enter.</p>
+</div>
+
+</body>
+</html>
